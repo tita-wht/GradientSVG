@@ -5,38 +5,51 @@ from typing import Union
 Num = Union[int, float]
 
 
-class SVGTensor:
-    #                       0    1    2    3     4      5     6
-    COMMANDS_SIMPLIFIED = ["m", "l", "c", "a", "EOS", "SOS", "z"]
+class SVGTensor: 
+    """論文中 S_(i,j) を示す 
 
+    Returns:
+        _type_: _description_
+    """
+    
+    #           0       1         2          3 no use    4 no use   5       6      7 
+    ELEMENTS = ["rect", "circle", "ellipse", "polyline", "polygon", "path", "EOS", "SOS"]
+
+    PATH_COMMANDS = ["m", # path moveTo
+                     "l", # path lineTo 
+                     "c", # path cubic bezier curve
+                     "q", # path quadratic bezier curve
+                     "a", # path arcTo
+                     "z"] # path closePath
+    
     #                              rad  x  lrg sw  ctrl ctrl  end
     #                              ius axs arc eep  1    2    pos
     #                                   rot fg fg
     CMD_ARGS_MASK = torch.tensor([[0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1],   # m
                                   [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1],   # l
                                   [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1],   # c
+                                  [0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1],   # q
                                   [1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1],   # a
-                                  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],   # EOS
-                                  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],   # SOS
                                   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]])  # z
 
-    class Index:
-        COMMAND = 0
-        RADIUS = slice(1, 3)
-        X_AXIS_ROT = 3
-        LARGE_ARC_FLG = 4
-        SWEEP_FLG = 5
-        START_POS = slice(6, 8)
-        CONTROL1 = slice(8, 10)
-        CONTROL2 = slice(10, 12)
-        END_POS = slice(12, 14)
+    class Index:  # indicate S_(i,j) indices (show in paper))
+        ELEMENT = 0
+        COMMAND = 1
+        RADIUS = slice(2, 4)
+        X_AXIS_ROT = 4
+        LARGE_ARC_FLG = 5
+        SWEEP_FLG = 6
+        START_POS = slice(7, 9)
+        CONTROL1 = slice(9, 11)
+        CONTROL2 = slice(11, 13)
+        END_POS = slice(13, 15)
 
-    class IndexArgs:
+    class IndexArgs: # CMD_ARGS_MASK indices 
         RADIUS = slice(0, 2)
-        X_AXIS_ROT = 2
+        X_AXIS_ROT = 2          # rotated by this angle (degrees) around x-axis
         LARGE_ARC_FLG = 3
         SWEEP_FLG = 4
-        CONTROL1 = slice(5, 7)
+        CONTROL1 = slice(5, 7)  # NOTE: ctrl0 is root posisiton = start_pos
         CONTROL2 = slice(7, 9)
         END_POS = slice(9, 11)
 
@@ -44,12 +57,12 @@ class SVGTensor:
     all_position_keys = ["start_pos", *position_keys]
     arg_keys = ["radius", "x_axis_rot", "large_arc_flg", "sweep_flg", *position_keys]
     all_arg_keys = [*arg_keys[:4], "start_pos", *arg_keys[4:]]
-    cmd_arg_keys = ["commands", *arg_keys]
-    all_keys = ["commands", *all_arg_keys]
+    elem_keys = ["elements", "commands", *arg_keys]
+    all_elem_keys = ["elements", "commands", *all_arg_keys]
 
-    def __init__(self, commands, radius, x_axis_rot, large_arc_flg, sweep_flg, control1, control2, end_pos,
-                 seq_len=None, label=None, PAD_VAL=-1, ARGS_DIM=256, filling=0):
+    def __init__(self, elements, commands, radius, x_axis_rot, large_arc_flg, sweep_flg, control1, control2, end_pos, seq_len=None, label=None, PAD_VAL=-1, ARGS_DIM=256, filling=0):
 
+        self.elements = elements.reshape(-1, 1).float()
         self.commands = commands.reshape(-1, 1).float()
 
         self.radius = radius.float()
@@ -67,8 +80,8 @@ class SVGTensor:
         self.PAD_VAL = PAD_VAL
         self.ARGS_DIM = ARGS_DIM
 
-        self.sos_token = torch.Tensor([self.COMMANDS_SIMPLIFIED.index("SOS")]).unsqueeze(-1)
-        self.eos_token = self.pad_token = torch.Tensor([self.COMMANDS_SIMPLIFIED.index("EOS")]).unsqueeze(-1)
+        self.sos_token = torch.Tensor([self.ELEMENTS.index("SOS")]).unsqueeze(-1)
+        self.eos_token = self.pad_token = torch.Tensor([self.ELEMENTS.index("EOS")]).unsqueeze(-1)
 
         self.filling = filling
 
@@ -83,30 +96,47 @@ class SVGTensor:
 
     @staticmethod
     def from_data(data, *args, **kwargs):
-        return SVGTensor(data[:, SVGTensor.Index.COMMAND], data[:, SVGTensor.Index.RADIUS], data[:, SVGTensor.Index.X_AXIS_ROT],
-                         data[:, SVGTensor.Index.LARGE_ARC_FLG], data[:, SVGTensor.Index.SWEEP_FLG], data[:, SVGTensor.Index.CONTROL1],
-                         data[:, SVGTensor.Index.CONTROL2], data[:, SVGTensor.Index.END_POS], *args, **kwargs)
+        # sample_data = torch.tensor([
+        #         [0, 0, 10, 20, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6],  # 1行目: rect
+        #         [1, 1, 15, 25, 0, 0, 0, 0, 0, 5, 6, 7, 8, 9, 10], # 2行目: circle
+        #         ], dtype=torch.float32)
+        return SVGTensor(data[:, SVGTensor.Index.ELEMENT],
+                         data[:, SVGTensor.Index.COMMAND], 
+                         data[:, SVGTensor.Index.RADIUS], 
+                         data[:, SVGTensor.Index.X_AXIS_ROT],
+                         data[:, SVGTensor.Index.LARGE_ARC_FLG], 
+                         data[:, SVGTensor.Index.SWEEP_FLG], 
+                         data[:, SVGTensor.Index.CONTROL1],
+                         data[:, SVGTensor.Index.CONTROL2], 
+                         data[:, SVGTensor.Index.END_POS], 
+                         *args, **kwargs)
 
     @staticmethod
-    def from_cmd_args(commands, args, *nargs, **kwargs):
-        return SVGTensor(commands, args[:, SVGTensor.IndexArgs.RADIUS], args[:, SVGTensor.IndexArgs.X_AXIS_ROT],
-                         args[:, SVGTensor.IndexArgs.LARGE_ARC_FLG], args[:, SVGTensor.IndexArgs.SWEEP_FLG], args[:, SVGTensor.IndexArgs.CONTROL1],
-                         args[:, SVGTensor.IndexArgs.CONTROL2], args[:, SVGTensor.IndexArgs.END_POS], *nargs, **kwargs)
+    def from_cmd_args(elements, commands, args, *nargs, **kwargs): # MEMO: 呼び出し注意
+        return SVGTensor(elements, 
+                         commands, 
+                         args[:, SVGTensor.IndexArgs.RADIUS], 
+                         args[:, SVGTensor.IndexArgs.X_AXIS_ROT],
+                         args[:, SVGTensor.IndexArgs.LARGE_ARC_FLG], 
+                         args[:, SVGTensor.IndexArgs.SWEEP_FLG], 
+                         args[:, SVGTensor.IndexArgs.CONTROL1],
+                         args[:, SVGTensor.IndexArgs.CONTROL2], 
+                         args[:, SVGTensor.IndexArgs.END_POS], 
+                         *nargs, **kwargs)
 
     def get_data(self, keys):
         return torch.cat([self.__getattribute__(key) for key in keys], dim=-1)
 
     @property
     def data(self):
-        return self.get_data(self.all_keys)
+        return self.get_data(self.all_elem_keys)
 
     def copy(self):
         return SVGTensor(*[self.__getattribute__(key).clone() for key in self.cmd_arg_keys],
-                         seq_len=self.seq_len.clone(), label=self.label, PAD_VAL=self.PAD_VAL, ARGS_DIM=self.ARGS_DIM,
-                         filling=self.filling)
+                         seq_len=self.seq_len.clone(), label=self.label, PAD_VAL=self.PAD_VAL, ARGS_DIM=self.ARGS_DIM, filling=self.filling)
 
-    def add_sos(self):
-        self.commands = torch.cat([self.sos_token, self.commands])
+    def add_sos(self): # NOTE: pad_val = -1 (in paper, PAD_VAL = 0)
+        self.elements = torch.cat([self.sos_token, self.elements])
 
         for key in self.arg_keys:
             v = self.__getattribute__(key)
@@ -116,14 +146,14 @@ class SVGTensor:
         return self
 
     def drop_sos(self):
-        for key in self.cmd_arg_keys:
+        for key in self.elem_keys:
             self.__setattr__(key, self.__getattribute__(key)[1:])
 
         self.seq_len -= 1
         return self
 
     def add_eos(self):
-        self.commands = torch.cat([self.commands, self.eos_token])
+        self.elements = torch.cat([self.elements, self.eos_token])
 
         for key in self.arg_keys:
             v = self.__getattribute__(key)
@@ -132,9 +162,9 @@ class SVGTensor:
         return self
 
     def pad(self, seq_len=51):
-        pad_len = max(seq_len - len(self.commands), 0)
+        pad_len = max(seq_len - len(self.elements), 0)
 
-        self.commands = torch.cat([self.commands, self.pad_token.repeat(pad_len, 1)])
+        self.elements = torch.cat([self.elements, self.pad_token.repeat(pad_len, 1)])
 
         for key in self.arg_keys:
             v = self.__getattribute__(key)
@@ -144,14 +174,17 @@ class SVGTensor:
 
     def unpad(self):
         # Remove EOS + padding
-        for key in self.cmd_arg_keys:
+        for key in self.elem_keys:
             self.__setattr__(key, self.__getattribute__(key)[:self.seq_len])
         return self
 
     def draw(self, *args, **kwags):
-        from deepsvg.svglib.svg import SVGPath
+        from svglib.svg import SVGPath
         return SVGPath.from_tensor(self.data).draw(*args, **kwags)
 
+    def elems(self):
+        return self.elements.reshape(-1)
+    
     def cmds(self):
         return self.commands.reshape(-1)
 
@@ -162,7 +195,9 @@ class SVGTensor:
         return self.get_data(self.arg_keys)
 
     def _get_real_commands_mask(self):
-        mask = self.cmds() < self.COMMANDS_SIMPLIFIED.index("EOS")
+        elem_mask = self.elems() < self.ELEMENTS.index("EOS") # There are elements other than EOS and SOS
+        cmd_mask = self.cmds() < len(self.PATH_COMMANDS) # There are commands other than z
+        mask = elem_mask & cmd_mask
         return mask
 
     def _get_args_mask(self):
@@ -247,3 +282,4 @@ class SVGTensor:
         matching = d.argmin(dim=-1)
 
         return p[matching]
+
