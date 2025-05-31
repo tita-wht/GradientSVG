@@ -4,6 +4,7 @@ import torch.utils.data
 from typing import Union
 Num = Union[int, float]
 
+# NOTE: パディングの値が-1の場合、SOS追加によって、SOSの次トークンの初期位置が-1になる。
 
 class SVGTensor: 
     """論文中 S_(i,j) を示す 
@@ -74,7 +75,7 @@ class SVGTensor:
         self.control2 = control2.float()
         self.end_pos = end_pos.float()
 
-        self.seq_len = torch.tensor(len(commands)) if seq_len is None else seq_len
+        self.seq_len = torch.tensor(len(elements)) if seq_len is None else seq_len
         self.label = label
 
         self.PAD_VAL = PAD_VAL
@@ -137,6 +138,7 @@ class SVGTensor:
 
     def add_sos(self): # NOTE: pad_val = -1 (in paper, PAD_VAL = 0)
         self.elements = torch.cat([self.sos_token, self.elements])
+        self.commands = torch.cat([self.commands.new_full((1, 1), self.PAD_VAL), self.commands])
 
         for key in self.arg_keys:
             v = self.__getattribute__(key)
@@ -154,6 +156,7 @@ class SVGTensor:
 
     def add_eos(self):
         self.elements = torch.cat([self.elements, self.eos_token])
+        self.commands = torch.cat([self.commands.new_full((1, 1), self.PAD_VAL), self.commands])
 
         for key in self.arg_keys:
             v = self.__getattribute__(key)
@@ -165,6 +168,7 @@ class SVGTensor:
         pad_len = max(seq_len - len(self.elements), 0)
 
         self.elements = torch.cat([self.elements, self.pad_token.repeat(pad_len, 1)])
+        self.commands = torch.cat([self.commands, self.pad_token.repeat(pad_len, 1)])
 
         for key in self.arg_keys:
             v = self.__getattribute__(key)
