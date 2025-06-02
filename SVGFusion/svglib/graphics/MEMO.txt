@@ -1,0 +1,23 @@
+以下のような継承関係
+textの方は後で実装
+
+
+Element
+└── SVGElement
+    ├── SVGGraphicsElement                  ← 描画可能な要素の基底
+    │   ├── SVGGeometryElement              ← 幾何学形状を持つ要素
+    │   │   ├── SVGCircleElement            ← <circle>
+    │   │   ├── SVGEllipseElement           ← <ellipse>
+    │   │   ├── SVGLineElement              ← <line>
+    │   │   ├── SVGPathElement              ← <path>
+    │   │   ├── SVGPolygonElement           ← <polygon>
+    │   │   ├── SVGPolylineElement          ← <polyline>
+    │   │   └── SVGRectElement              ← <rect>
+    │   ├── SVGTextContentElement           ← テキストを描画する要素
+    │   │   ├── SVGTextElement              ← <text>
+    │   │   ├── SVGTSpanElement             ← <tspan>
+    │   │   ├── SVGTRefElement (非推奨)     ← <tref>
+    │   │   └── SVGTextPathElement          ← <textPath>
+    │   ├── SVGGElement                     ← <g>
+    │   └── SVGUseElement                   ← <use>
+    │

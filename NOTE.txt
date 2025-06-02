@@ -14,3 +14,54 @@ note:
 ・REFL：反射制御点付き
 ・Arc
 → 大文字小文字での絶対相対座標変換をあたえればよい気がする
+
+グラフィック要素 + グラデーション要素 + 構造的要素 を理解するところまで
+次 → アニメーション要素  → 説明的要素
+
+
+Element
+└── SVGElement
+    ├── SVGGraphicsElement                  ← 描画可能な要素の基底
+    │   ├── SVGGeometryElement              ← 幾何学形状を持つ要素
+    │   │   ├── SVGCircleElement            ← <circle>
+    │   │   ├── SVGEllipseElement           ← <ellipse>
+    │   │   ├── SVGLineElement              ← <line>
+    │   │   ├── SVGPathElement              ← <path>
+    │   │   ├── SVGPolygonElement           ← <polygon>
+    │   │   ├── SVGPolylineElement          ← <polyline>
+    │   │   └── SVGRectElement              ← <rect>
+    │   ├── SVGTextContentElement           ← テキストを描画する要素
+    │   │   ├── SVGTextElement              ← <text>
+    │   │   ├── SVGTSpanElement             ← <tspan>
+    │   │   ├── SVGTRefElement (非推奨)     ← <tref>
+    │   │   └── SVGTextPathElement          ← <textPath>
+    │   ├── SVGGElement                     ← <g>
+    │   └── SVGUseElement                   ← <use>
+    │
+    ├── SVGDefsElement                      ← <defs>
+    ├── SVGSymbolElement                    ← <symbol>
+    ├── SVGImageElement                     ← <image>
+    ├── SVGSwitchElement                    ← <switch>
+    ├── SVGScriptElement                    ← <script>
+    ├── SVGStyleElement                     ← <style>
+    ├── SVGTitleElement                     ← <title>
+    ├── SVGDescElement                      ← <desc>
+    │
+    ├── SVGAnimationElement                 ← アニメーションの基底
+    │   ├── SVGAnimateElement               ← <animate>
+    │   ├── SVGSetElement                   ← <set>
+    │   ├── SVGAnimateTransformElement      ← <animateTransform>
+    │   └── SVGAnimateMotionElement         ← <animateMotion>
+    │
+    ├── SVGGradientElement (抽象)          ← グラデーション基底
+    │   ├── SVGLinearGradientElement        ← <linearGradient>
+    │   └── SVGRadialGradientElement        ← <radialGradient>
+    │
+    ├── SVGPatternElement                   ← <pattern>
+    ├── SVGClipPathElement                  ← <clipPath>
+    ├── SVGMaskElement                      ← <mask>
+    ├── SVGFilterElement                    ← <filter>
+    ├── SVGMarkerElement                    ← <marker>
+    ├── SVGForeignObjectElement             ← <foreignObject>
+    ├── SVGViewElement                      ← <view>
+    └── SVGSVGElement                       ← <svg>（ルート）

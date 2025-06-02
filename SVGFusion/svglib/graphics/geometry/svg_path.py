@@ -1,6 +1,6 @@
 from __future__ import annotations
 from .geom import *
-import deepsvg.svglib.geom as geom
+import svglib.geom as geom
 import re
 import torch
 from typing import List, Union
@@ -10,6 +10,7 @@ import shapely.geometry
 import numpy as np
 
 from .geom import union_bbox
+from .svg_primitive import SVGPrimitive
 from .svg_command import SVGCommand, SVGCommandMove, SVGCommandClose, SVGCommandBezier, SVGCommandLine, SVGCommandArc
 
 
@@ -26,19 +27,18 @@ class Orientation:
     CLOCKWISE = 1
 
 
-class Filling:
+class Filling: # update me
     OUTLINE = 0
     FILL = 1
     ERASE = 2
 
 
-class SVGPath:
+class SVGPath(SVGPrimitive):
     def __init__(self, path_commands: List[SVGCommand] = None, origin: Point = None, closed=False, filling=Filling.OUTLINE):
+        super().__init__()
         self.origin = origin or Point(0.)
         self.path_commands = path_commands
         self.closed = closed
-
-        self.filling = filling
 
     @property
     def start_command(self):
@@ -90,6 +90,9 @@ class SVGPath:
         stroke = x.getAttribute('stroke')
         dasharray = x.getAttribute('dasharray')
         stroke_width = x.getAttribute('stroke-width')
+        # pathLength = x.getAttribute('pathLength') 
+        # パスの全長から再描画する 
+        # あんまり使われない（アニメーションで使用）ので一旦無視
 
         fill = not x.hasAttribute("fill") or not x.getAttribute("fill") == "none"
 
