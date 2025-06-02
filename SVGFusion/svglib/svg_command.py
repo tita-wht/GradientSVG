@@ -49,17 +49,34 @@ class SVGCommand:
 
     @staticmethod
     def from_str(cmd_str: str, args_str: List[Num], pos=None, initial_pos=None, prev_command: SVGCommand = None):
+        """_summary_
+
+        Args:
+            cmd_str (str): "m", "l", "c", "z", "a", "q", "h", "v", "s", "t", used in path.
+            args_str (List[Num]): _list of arguments for the command, e.g. [x, y] for "m", [x1, y1, x2, y2, x, y] for "c". not string.
+            pos (_type_, optional): current position.(previous end position) Defaults to None.
+            initial_pos (_type_, optional): initial position.(update "m" command) Defaults to None.
+            prev_command (SVGCommand, optional): ひとつ前のコマンド. Defaults to None.
+
+        Returns:
+            l: command object list
+            pos: current position (updated)
+            initial_pos: initial position (updated)
+        """
         if pos is None:
             pos = Point(0.)
         if initial_pos is None:
             initial_pos = Point(0.)
 
+        # fixme: svg上では大文字と小文字で意味が異なるが、ここでは区別していない。
+        # memo: 大文字は絶対座標、小文字は相対座標
+        # つまり、絶対座標のSVGはバグる可能性がある
         cmd = SVGCmdEnum(cmd_str.lower())
 
         # Implicit MoveTo commands are treated as LineTo
         if cmd is SVGCmdEnum.MOVE_TO and len(args_str) > 2:
             l_cmd_str = SVGCmdEnum.LINE_TO.value
-            if cmd_str.isupper():
+            if cmd_str.isupper(): # 大文字の場合 LineTo も大文字で使用する
                 l_cmd_str = l_cmd_str.upper()
 
             l1, pos, initial_pos = SVGCommand.from_str(cmd_str, args_str[:2], pos, initial_pos)
@@ -132,9 +149,14 @@ class SVGCommand:
 
     @staticmethod
     def from_tensor(vector: torch.Tensor):
+        # NOTE: 使用例によってtensorが異なる可能性がある。
+        # 実際の使用例をよく見ること
+        # a. パスコマンドのみの場合 （deepsvg）1+11
+        ## 下記の実装はこっち。 all_arg_keys
+        # b. エレメント文字を含む場合 (svgfusion) 1+1+11
         cmd_index, args = int(vector[0]), vector[1:]
 
-        cmd = SVGCmdEnum(SVGTensor.COMMANDS_SIMPLIFIED[cmd_index])
+        cmd = SVGCmdEnum(SVGTensor.PATH_COMMANDS[cmd_index])
         radius = Radius(*args[:2].tolist())
         x_axis_rotation = Angle(*args[2:3].tolist())
         large_arc_flag = Flag(args[3].item())
@@ -147,8 +169,8 @@ class SVGCommand:
         return SVGCommand.from_args(cmd, radius, x_axis_rotation, large_arc_flag, sweep_flag, start_pos, control1, control2, end_pos)
 
     @staticmethod
-    def from_args(command: SVGCmdEnum, radius: Radius, x_axis_rotation: Angle, large_arc_flag: Flag,
-                  sweep_flag: Flag, start_pos: Point, control1: Point, control2: Point, end_pos: Point):
+    def from_args(command: SVGCmdEnum, radius: Radius, x_axis_rotation: Angle, large_arc_flag: Flag, sweep_flag: Flag, start_pos: Point, control1: Point, control2: Point, end_pos: Point):
+        # updateme: h, v, s, t
         if command is SVGCmdEnum.MOVE_TO:
             return SVGCommandMove(start_pos, end_pos)
         elif command is SVGCmdEnum.LINE_TO:
