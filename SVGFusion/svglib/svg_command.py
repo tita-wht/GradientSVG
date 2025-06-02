@@ -117,7 +117,10 @@ class SVGCommand:
             elif cmd is SVGCmdEnum.CUBIC_BEZIER:
                 cmd_parsed = SVGCommandBezier(pos, *args)
             elif cmd is SVGCmdEnum.QUAD_BEZIER:
-                cmd_parsed = SVGCommandBezier(pos, args[0], args[0], args[1])
+                cmd_parsed = SVGCommandBezier(pos, args[0], args[0], args[1]) 
+                # fixme: たぶん違う。argsの入れ方次第でもあるが、
+                # P0=Q0, p1=Q0/3+2*Q1/3, p2=Q2/3+2*Q1/3, p3=Q3
+                # のはず。
             elif cmd is SVGCmdEnum.QUAD_BEZIER_REFL or cmd is SVGCmdEnum.CUBIC_BEZIER_REFL:
                 if isinstance(prev_command, SVGCommandBezier):
                     control1 = pos * 2 - prev_command.control2
@@ -230,7 +233,7 @@ class SVGCommandLinear(SVGCommand):
         super().__init__(*args, **kwargs)
 
     def to_tensor(self, PAD_VAL=-1):
-        cmd_index = SVGTensor.COMMANDS_SIMPLIFIED.index(self.command.value)
+        cmd_index = SVGTensor.PATH_COMMANDS.index(self.command.value)
         return torch.tensor([cmd_index,
                              *([PAD_VAL] * 5),
                              *self.start_pos.to_tensor(),
@@ -238,6 +241,7 @@ class SVGCommandLinear(SVGCommand):
                              *self.end_pos.to_tensor()])
 
     def numericalize(self, n=256):
+        # 0~1 -> 0~255(n)
         self.start_pos.numericalize(n)
         self.end_pos.numericalize(n)
 
@@ -329,7 +333,7 @@ class SVGCommandBezier(SVGCommand):
         return SVGCommandBezier(self.start_pos.copy(), self.control1.copy(), self.control2.copy(), self.end_pos.copy())
 
     def to_tensor(self, PAD_VAL=-1):
-        cmd_index = SVGTensor.COMMANDS_SIMPLIFIED.index(SVGCmdEnum.CUBIC_BEZIER.value)
+        cmd_index = SVGTensor.PATH_COMMANDS.index(SVGCmdEnum.CUBIC_BEZIER.value)
         return torch.tensor([cmd_index,
                              *([PAD_VAL] * 5),
                              *self.start_pos.to_tensor(),
@@ -374,6 +378,7 @@ class SVGCommandBezier(SVGCommand):
         return (1 - t)**3 * self.start_pos + 3 * (1 - t)**2 * t * self.control1 + 3 * (1 - t) * t**2 * self.control2 + t**3 * self.end_pos
 
     def derivative(self, t, n=1):
+        # n is the order of derivative (n回微分)
         if n == 1:
             return 3 * (1 - t)**2 * (self.control1 - self.start_pos) + 6 * (1 - t) * t * (self.control2 - self.control1) + 3 * t**2 * (self.end_pos - self.control2)
         elif n == 2:
@@ -467,7 +472,7 @@ class SVGCommandArc(SVGCommand):
                              self.sweep_flag.copy(), self.end_pos.copy())
 
     def to_tensor(self, PAD_VAL=-1):
-        cmd_index = SVGTensor.COMMANDS_SIMPLIFIED.index(SVGCmdEnum.ELLIPTIC_ARC.value)
+        cmd_index = SVGTensor.PATH_COMMANDS.index(SVGCmdEnum.ELLIPTIC_ARC.value)
         return torch.tensor([cmd_index,
                              *self.radius.to_tensor(),
                              *self.x_axis_rotation.to_tensor(),
