@@ -1,3 +1,16 @@
 SVGFusionを再現実装
 ・ニューラルパス表現変換器
 ・VP-VAE部分
+
+darwとfrom_str, from_SVGあたりは編集する必要あり
+
+note: 
+コマンドの基底クラス+
+・linear(始点終点で示される直線タイプのコマンドの抽象クラス)
+・MoveTo: 
+・Line: l,h,v
+・Close
+・Bezier: q,c ← ここなんかおかしい気がする
+・REFL：反射制御点付き
+・Arc
+→ 大文字小文字での絶対相対座標変換をあたえればよい気がする
