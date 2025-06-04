@@ -1,5 +1,5 @@
 from __future__ import annotations
-from .geom import *
+from ...geom import *
 import svglib.geom as geom
 import re
 import torch
@@ -9,8 +9,8 @@ import math
 import shapely.geometry
 import numpy as np
 
-from .geom import union_bbox
-from .svg_primitive import SVGPrimitive
+from ...geom import union_bbox
+from .svg_primitives import SVGPrimitive
 from .svg_command import SVGCommand, SVGCommandMove, SVGCommandClose, SVGCommandBezier, SVGCommandLine, SVGCommandArc
 
 
@@ -53,7 +53,7 @@ class SVGPath(SVGPrimitive):
         return self.path_commands[-1].end_pos
 
     def to_group(self, *args, **kwargs):
-        from .svg_primitive import SVGPathGroup
+        from .svg_primitives import SVGPathGroup
         return SVGPathGroup([self], *args, **kwargs)
 
     def set_filling(self, filling=True):
@@ -119,7 +119,7 @@ class SVGPath(SVGPrimitive):
 
     @staticmethod
     def from_commands(path_commands: List[SVGCommand], fill=False, filling=Filling.OUTLINE, add_closing=False, allow_empty=False):
-        from .svg_primitive import SVGPathGroup
+        from .svg_primitives import SVGPathGroup
 
         if not path_commands:
             return SVGPathGroup([])
@@ -174,7 +174,7 @@ class SVGPath(SVGPrimitive):
         return [*points, *handles]
 
     def draw(self, viewbox=Bbox(24), *args, **kwargs):
-        from .svg import SVG
+        from ...svg import SVG
         return SVG([self.to_group()], viewbox=viewbox).draw(*args, **kwargs)
 
     def _get_points_viz(self, color_firstlast=True, with_moves=True):
@@ -318,8 +318,8 @@ class SVGPath(SVGPrimitive):
         return self
 
     def to_video(self, wrapper, clips=None, svg_commands=None, color="grey"):
-        from .svg import SVG
-        from .svg_primitive import SVGLine, SVGCircle
+        from ...svg import SVG
+        from .svg_primitives import SVGLine, SVGCircle
 
         if clips is None:
             clips = []

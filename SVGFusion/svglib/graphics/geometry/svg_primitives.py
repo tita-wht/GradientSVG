@@ -1,5 +1,7 @@
+# プリミティブ具象クラス
+
 from __future__ import annotations
-from .geom import *
+from ...geom import *
 import torch
 import re
 from typing import List, Union
@@ -8,81 +10,32 @@ from .svg_path import SVGPath
 from .svg_command import SVGCommandLine, SVGCommandArc, SVGCommandBezier, SVGCommandClose
 import shapely
 import shapely.ops
-import shapely.geometry
 import networkx as nx
 
+from .svg_geometry import SVGGeometry
 
-FLOAT_RE = re.compile(r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?")
-
-
-def extract_args(args):
-    return list(map(float, FLOAT_RE.findall(args)))
-
-
-class SVGPrimitive:
-    """
-    Reference: https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Basic_Shapes
-    """
-    def __init__(self, color="black", fill=False, dasharray=None, stroke_width=".3", opacity=1.0):
-        self.color = color
-        self.dasharray = dasharray
-        self.stroke_width = stroke_width
-        self.opacity = opacity
-
-        self.fill = fill
-
-    def _get_fill_attr(self):
-        fill_attr = f'fill="{self.color}" fill-opacity="{self.opacity}"' if self.fill else f'fill="none" stroke="{self.color}" stroke-width="{self.stroke_width}" stroke-opacity="{self.opacity}"'
-        if self.dasharray is not None and not self.fill:
-            fill_attr += f' stroke-dasharray="{self.dasharray}"'
-        return fill_attr
-
-    @classmethod
-    def from_xml(cls, x: minidom.Element):
-        raise NotImplementedError
-
-    def draw(self, viewbox=Bbox(24), *args, **kwargs):
-        from .svg import SVG
-        return SVG([self], viewbox=viewbox).draw(*args, **kwargs)
-
-    def _get_viz_elements(self, with_points=False, with_handles=False, with_bboxes=False, color_firstlast=True, with_moves=True):
-        return []
-
-    def to_path(self):
-        raise NotImplementedError
-
-    def copy(self):
-        raise NotImplementedError
-
-    def bbox(self):
-        raise NotImplementedError
-
-    def fill_(self, fill=True):
-        self.fill = fill
-        return self
-
-
-class SVGEllipse(SVGPrimitive):
+class SVGEllipse(SVGGeometry):
     def __init__(self, center: Point, radius: Radius, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.center = center
         self.radius = radius
+        # self.pathlength = None
 
     def __repr__(self):
         return f'SVGEllipse(c={self.center} r={self.radius})'
 
     def to_str(self, *args, **kwargs):
-        fill_attr = self._get_fill_attr()
-        return f'<ellipse {fill_attr} cx="{self.center.x}" cy="{self.center.y}" rx="{self.radius.x}" ry="{self.radius.y}"/>'
+        color_attr = self._get_color_attr()
+        return f'<ellipse {color_attr} cx="{self.center.x}" cy="{self.center.y}" rx="{self.radius.x}" ry="{self.radius.y}"/>'
 
     @classmethod
     def from_xml(_, x: minidom.Element):
-        fill = not x.hasAttribute("fill") or not x.getAttribute("fill") == "none"
+        color_attrs = SVGGeometry.from_xml_color_attrs(x)
 
         center = Point(float(x.getAttribute("cx")), float(x.getAttribute("cy")))
         radius = Radius(float(x.getAttribute("rx")), float(x.getAttribute("ry")))
-        return SVGEllipse(center, radius, fill=fill)
+        return SVGEllipse(center, radius, **color_attrs)
 
     def to_path(self):
         p0, p1 = self.center + self.radius.xproj(), self.center + self.radius.yproj()
@@ -104,19 +57,19 @@ class SVGCircle(SVGEllipse):
         return f'SVGCircle(c={self.center} r={self.radius})'
 
     def to_str(self, *args, **kwargs):
-        fill_attr = self._get_fill_attr()
-        return f'<circle {fill_attr} cx="{self.center.x}" cy="{self.center.y}" r="{self.radius.x}"/>'
+        color_attr = self._get_color_attr()
+        return f'<circle {color_attr} cx="{self.center.x}" cy="{self.center.y}" r="{self.radius.x}"/>'
 
     @classmethod
     def from_xml(_, x: minidom.Element):
-        fill = not x.hasAttribute("fill") or not x.getAttribute("fill") == "none"
+        color_attrs = SVGGeometry.from_xml_color_attrs(x)
 
         center = Point(float(x.getAttribute("cx")), float(x.getAttribute("cy")))
         radius = Radius(float(x.getAttribute("r")))
-        return SVGCircle(center, radius, fill=fill)
+        return SVGCircle(center, radius, **color_attrs)
 
 
-class SVGRectangle(SVGPrimitive):
+class SVGRectangle(SVGGeometry):
     def __init__(self, xy: Point, wh: Size, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -127,12 +80,12 @@ class SVGRectangle(SVGPrimitive):
         return f'SVGRectangle(xy={self.xy} wh={self.wh})'
 
     def to_str(self, *args, **kwargs):
-        fill_attr = self._get_fill_attr()
-        return f'<rect {fill_attr} x="{self.xy.x}" y="{self.xy.y}" width="{self.wh.x}" height="{self.wh.y}"/>'
+        color_attr = self._get_color_attr()
+        return f'<rect {color_attr} x="{self.xy.x}" y="{self.xy.y}" width="{self.wh.x}" height="{self.wh.y}"/>'
 
     @classmethod
     def from_xml(_, x: minidom.Element):
-        fill = not x.hasAttribute("fill") or not x.getAttribute("fill") == "none"
+        color_attrs = SVGGeometry.from_xml_color_attrs(x)
 
         xy = Point(0.)
         if x.hasAttribute("x"):
@@ -140,7 +93,7 @@ class SVGRectangle(SVGPrimitive):
         if x.hasAttribute("y"):
             xy.pos[1] = float(x.getAttribute("y"))
         wh = Size(float(x.getAttribute("width")), float(x.getAttribute("height")))
-        return SVGRectangle(xy, wh, fill=fill)
+        return SVGRectangle(xy, wh, **color_attrs)
 
     def to_path(self):
         p0, p1, p2, p3 = self.xy, self.xy + self.wh.xproj(), self.xy + self.wh, self.xy + self.wh.yproj()
@@ -153,7 +106,7 @@ class SVGRectangle(SVGPrimitive):
         return SVGPath(commands, closed=True).to_group(fill=self.fill)
 
 
-class SVGLine(SVGPrimitive):
+class SVGLine(SVGGeometry):
     def __init__(self, start_pos: Point, end_pos: Point, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -164,22 +117,22 @@ class SVGLine(SVGPrimitive):
         return f'SVGLine(xy1={self.start_pos} xy2={self.end_pos})'
 
     def to_str(self, *args, **kwargs):
-        fill_attr = self._get_fill_attr()
-        return f'<line {fill_attr} x1="{self.start_pos.x}" y1="{self.start_pos.y}" x2="{self.end_pos.x}" y2="{self.end_pos.y}"/>'
+        color_attr = self._get_color_attr()
+        return f'<line {color_attr} x1="{self.start_pos.x}" y1="{self.start_pos.y}" x2="{self.end_pos.x}" y2="{self.end_pos.y}"/>'
 
     @classmethod
     def from_xml(_, x: minidom.Element):
-        fill = not x.hasAttribute("fill") or not x.getAttribute("fill") == "none"
+        color_attrs = SVGGeometry.from_xml_color_attrs(x)
 
         start_pos = Point(float(x.getAttribute("x1") or 0.), float(x.getAttribute("y1") or 0.))
         end_pos = Point(float(x.getAttribute("x2") or 0.), float(x.getAttribute("y2") or 0.))
-        return SVGLine(start_pos, end_pos, fill=fill)
+        return SVGLine(start_pos, end_pos, **color_attrs)
 
     def to_path(self):
         return SVGPath([SVGCommandLine(self.start_pos, self.end_pos)]).to_group(fill=self.fill)
 
 
-class SVGPolyline(SVGPrimitive):
+class SVGPolyline(SVGGeometry):
     def __init__(self, points: List[Point], *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -189,17 +142,22 @@ class SVGPolyline(SVGPrimitive):
         return f'SVGPolyline(points={self.points})'
 
     def to_str(self, *args, **kwargs):
-        fill_attr = self._get_fill_attr()
-        return '<polyline {} points="{}"/>'.format(fill_attr, ' '.join([p.to_str() for p in self.points]))
+        color_attr = self._get_color_attr()
+        return '<polyline {} points="{}"/>'.format(color_attr, ' '.join([p.to_str() for p in self.points]))
 
     @classmethod
     def from_xml(cls, x: minidom.Element):
-        fill = not x.hasAttribute("fill") or not x.getAttribute("fill") == "none"
+        
+        def extract_args(args):
+            FLOAT_RE = re.compile(r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?")
+            return list(map(float, FLOAT_RE.findall(args)))
+
+        color_attrs = SVGGeometry.from_xml_color_attrs(x)
 
         args = extract_args(x.getAttribute("points"))
         assert len(args) % 2 == 0, f"Expected even number of arguments for SVGPolyline: {len(args)} given"
         points = [Point(x, args[2*i+1]) for i, x in enumerate(args[::2])]
-        return cls(points, fill=fill)
+        return cls(points, **color_attrs)
 
     def to_path(self):
         commands = [SVGCommandLine(p1, p2) for p1, p2 in zip(self.points[:-1], self.points[1:])]
@@ -215,11 +173,11 @@ class SVGPolygon(SVGPolyline):
         return f'SVGPolygon(points={self.points})'
 
     def to_str(self, *args, **kwargs):
-        fill_attr = self._get_fill_attr()
-        return '<polygon {} points="{}"/>'.format(fill_attr, ' '.join([p.to_str() for p in self.points]))
+        color_attr = self._get_color_attr()
+        return '<polygon {} points="{}"/>'.format(color_attr, ' '.join([p.to_str() for p in self.points]))
 
 # path group の認識が間違っている気がする
-class SVGPathGroup(SVGPrimitive):
+class SVGPathGroup(SVGGeometry):
     def __init__(self, svg_paths: List[SVGPath] = None, origin=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.svg_paths = svg_paths
@@ -292,10 +250,9 @@ class SVGPathGroup(SVGPrimitive):
         return self
 
     def to_str(self, with_markers=False, *args, **kwargs):
-        fill_attr = self._get_fill_attr()
+        color_attr = self._get_color_attr()
         marker_attr = 'marker-start="url(#arrow)"' if with_markers else ''
-        return '<path {} {} filling="{}" d="{}"></path>'.format(fill_attr, marker_attr, self.path.filling,
-                                                   " ".join(svg_path.to_str() for svg_path in self.svg_paths))
+        return '<path {} {} filling="{}" d="{}"></path>'.format(color_attr, marker_attr, self.path.filling, " ".join(svg_path.to_str() for svg_path in self.svg_paths))
 
     def to_tensor(self, PAD_VAL=-1):
         return torch.cat([p.to_tensor(PAD_VAL=PAD_VAL) for p in self.svg_paths], dim=0)

@@ -209,7 +209,7 @@ class SVGCommand:
         return [self.start_pos, self.end_pos]
 
     def get_points_viz(self, first=False, last=False):
-        from ...svg_primitive import SVGCircle
+        from .svg_primitives import SVGCircle
         color = "red" if first else "purple" if last else "deepskyblue"  # "#C4C4C4"
         opacity = 0.75 if first or last else 1.0
         return [SVGCircle(self.end_pos, radius=Radius(0.4), color=color, fill=True, stroke_width=".1", opacity=opacity)]
@@ -267,7 +267,7 @@ class SVGCommandMove(SVGCommandLinear):
         super().__init__(SVGCmdEnum.MOVE_TO, [end_pos], start_pos, end_pos)
 
     def get_points_viz(self, first=False, last=False):
-        from ...svg_primitive import SVGLine
+        from .svg_primitives import SVGLine
         points_viz = super().get_points_viz(first, last)
         points_viz.append(SVGLine(self.start_pos, self.end_pos, color="red", dasharray=0.5))
         return points_viz
@@ -368,7 +368,7 @@ class SVGCommandBezier(SVGCommand):
         return [self.start_pos, self.control1, self.control2, self.end_pos]
 
     def get_handles_viz(self):
-        from ...svg_primitive import SVGLine, SVGCircle
+        from .svg_primitives import SVGLine, SVGCircle
         anchor_1 = SVGCircle(self.control1, radius=Radius(0.4), color="lime", fill=True, stroke_width=".1")
         anchor_2 = SVGCircle(self.control2, radius=Radius(0.4), color="lime", fill=True, stroke_width=".1")
 
