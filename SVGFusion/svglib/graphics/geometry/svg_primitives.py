@@ -176,8 +176,10 @@ class SVGPolygon(SVGPolyline):
         color_attr = self._get_color_attr()
         return '<polygon {} points="{}"/>'.format(color_attr, ' '.join([p.to_str() for p in self.points]))
 
-# path group の認識が間違っている気がする
-class SVGPathGroup(SVGGeometry):
+class SVGPathGroup(SVGGeometry()):
+    # PathGroupそのものはSVGには存在しない仮想的なクラス
+    # pathをまとめておいて置く場所（全てのパスに対して適用する便利関数をまとめたクラス的な）。deepsvgではpathとpathgroupが一緒に使われる想定。
+    # NOTE:<g>とは別物と認識する
     def __init__(self, svg_paths: List[SVGPath] = None, origin=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.svg_paths = svg_paths
@@ -250,9 +252,12 @@ class SVGPathGroup(SVGGeometry):
         return self
 
     def to_str(self, with_markers=False, *args, **kwargs):
-        color_attr = self._get_color_attr()
-        marker_attr = 'marker-start="url(#arrow)"' if with_markers else ''
-        return '<path {} {} filling="{}" d="{}"></path>'.format(color_attr, marker_attr, self.path.filling, " ".join(svg_path.to_str() for svg_path in self.svg_paths))
+        fill_attr = self._get_color_attr()
+        txt = ""
+        for path in self.paths:
+            txt = txt + path.to_str(fill_attr=fill_attr, with_markers=with_markers)
+            txt = txt + "\n"
+        return txt
 
     def to_tensor(self, PAD_VAL=-1):
         return torch.cat([p.to_tensor(PAD_VAL=PAD_VAL) for p in self.svg_paths], dim=0)

@@ -1,3 +1,7 @@
+Todo:
+primitiveのgroupを修正
+pathを修正
+
 SVGFusionを再現実装
 ・ニューラルパス表現変換器
 ・VP-VAE部分

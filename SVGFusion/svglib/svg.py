@@ -15,9 +15,9 @@ import networkx as nx
 
 Num = Union[int, float]
 
-from .svg_command import SVGCommandBezier
-from .svg_path import SVGPath, Filling, Orientation
-from .svg_primitive import SVGPathGroup, SVGRectangle, SVGCircle, SVGEllipse, SVGLine, SVGPolyline, SVGPolygon
+from .graphics.geometry.svg_command import SVGCommandBezier
+from .graphics.geometry.svg_path import SVGPath, Filling, Orientation
+from .graphics.geometry.svg_primitives import SVGPathGroup, SVGRectangle, SVGCircle, SVGEllipse, SVGLine, SVGPolyline, SVGPolygon
 from .geom import union_bbox
 
 

@@ -22,9 +22,9 @@ class SVGGeometry:
 
     def _get_color_attr(self):
         fill_attr = ""
-        if self.fill is not None:
+        if self.fill:
             fill_attr += f'fill="{self.fill}" fill-opacity="{self.fill_opacity}" '
-        if self.stroke is not None:
+        if self.stroke:
             fill_attr += f'stroke="{self.stroke}" stroke-width="{self.stroke_width}" stroke-opacity="{self.stroke_opacity}" '
         return fill_attr
 

@@ -10,7 +10,7 @@ import shapely.geometry
 import numpy as np
 
 from ...geom import union_bbox
-from .svg_primitives import SVGPrimitive
+from .svg_geometry import SVGGeometry
 from .svg_command import SVGCommand, SVGCommandMove, SVGCommandClose, SVGCommandBezier, SVGCommandLine, SVGCommandArc
 
 
@@ -32,9 +32,12 @@ class Filling: # update me
     FILL = 1
     ERASE = 2
 
+# MEMO: fillingが気に入らない。
+# Geometry にfillとstrokeを記述したので、ここからfillingが分かる
+# closedもcommandsの最後がzかどうか、または始点終点の一致によって分かるので@propertyの方が適切 （こっちは後）
 
-class SVGPath(SVGPrimitive):
-    def __init__(self, path_commands: List[SVGCommand] = None, origin: Point = None, closed=False, filling=Filling.OUTLINE):
+class SVGPath(SVGGeometry):
+    def __init__(self, path_commands: List[SVGCommand] = None, origin: Point = None, closed=False):
         super().__init__()
         self.origin = origin or Point(0.)
         self.path_commands = path_commands
@@ -69,8 +72,7 @@ class SVGPath(SVGPrimitive):
         return self.path_commands[idx-1]
 
     def all_commands(self, with_close=True):
-        close_cmd = [SVGCommandClose(self.path_commands[-1].end_pos.copy(), self.start_pos.copy())] if self.closed and self.path_commands and with_close \
-                    else ()
+        close_cmd = [SVGCommandClose(self.path_commands[-1].end_pos.copy(), self.start_pos.copy())] if self.closed and self.path_commands and with_close else ()
         return [self.start_command, *self.path_commands, *close_cmd]
 
     def copy(self):
@@ -90,9 +92,6 @@ class SVGPath(SVGPrimitive):
         stroke = x.getAttribute('stroke')
         dasharray = x.getAttribute('dasharray')
         stroke_width = x.getAttribute('stroke-width')
-        # pathLength = x.getAttribute('pathLength') 
-        # パスの全長から再描画する 
-        # あんまり使われない（アニメーションで使用）ので一旦無視
 
         fill = not x.hasAttribute("fill") or not x.getAttribute("fill") == "none"
 
@@ -162,8 +161,15 @@ class SVGPath(SVGPrimitive):
     def __repr__(self):
         return "SVGPath({})".format(" ".join(command.__repr__() for command in self.all_commands()))
 
-    def to_str(self, fill=False):
-        return " ".join(command.to_str() for command in self.all_commands())
+    def to_str(self, fill_attr: str="", with_markers=False):
+        if self._get_color_attr():
+            # groupで色が定義されている場合、子要素（このインスタンス）の色定義を優先
+            fill_attr = self._get_color_attr()
+        marker_attr = 'marker-start="url(#arrow)"' if with_markers else ''
+        command_attrs = " ".join(command.to_str() for command in self.all_commands())
+        txt = f'<path {fill_attr} {marker_attr} d="{command_attrs}"></path>'
+
+        return txt
 
     def to_tensor(self, PAD_VAL=-1):
         return torch.stack([command.to_tensor(PAD_VAL=PAD_VAL) for command in self.all_commands()])
