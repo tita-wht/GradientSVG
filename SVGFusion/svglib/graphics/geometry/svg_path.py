@@ -110,10 +110,12 @@ class SVGPath(SVGGeometry):
         pos = initial_pos = Point(0.)
         prev_command = None
         for cmd, args in SVGPath._tokenize_path(s):
+            # NOTE:fill-ruleが結構重要
+            # nonzero(default)の場合 → 二重丸のような構造を記述したとき、内側の閉領域が外側の閉領域と「逆向きに」定義された場合、内側の閉領域内部を「外側」と認識する(=穴の開いた図形)。（内側の内側が存在する場合、その向きによって「外」と「内」を決定する）
+            # evenoddの場合 → 内側の閉領域が外側の閉領域と「同じ向きに」定義されていても、内側の閉領域を「外側」と認識する。（内側の内側が存在する場合は常に「外」と「内」が入れ替わる）
             cmd_parsed, pos, initial_pos = SVGCommand.from_str(cmd, args, pos, initial_pos, prev_command)
             prev_command = cmd_parsed[-1]
             path_commands.extend(cmd_parsed)
-
         return SVGPath.from_commands(path_commands, fill=fill, stroke=stroke, add_closing=add_closing)
 
     @staticmethod
@@ -121,7 +123,14 @@ class SVGPath(SVGGeometry):
         return SVGPath.from_commands([SVGCommand.from_tensor(row) for row in tensor], allow_empty=allow_empty)
 
     @staticmethod
-    def from_commands(path_commands: List[SVGCommand], fill="black", stroke=None, add_closing=False, allow_empty=False):
+    def from_commands(path_commands: List[SVGCommand], fill="black", stroke=None, add_closing=False, allow_empty=False, split_moveto=False):
+        # NOTE: ここではmovetoコマンドを始点として入力のパスを分割している。
+        # 好ましいのはそのまま入れること(movetoない場合ありそうだし)
+        # なので、split_movetoを引数に追加 （挙動的にはpathGroupを使用するかどうか？） そもそもpathgroupいらん。
+        # 通常はFalseにしておく。deepsvgの挙動が欲しい時はTrue
+
+        # FIXME: クソコードなのでリファクタリングしたい
+
         from .svg_primitives import SVGPathGroup
 
         if not path_commands:
@@ -131,30 +140,47 @@ class SVGPath(SVGGeometry):
         svg_path = None
 
         for command in path_commands:
-            if isinstance(command, SVGCommandMove):
-                if svg_path is not None and (allow_empty or svg_path.path_commands):  # SVGPath contains at least one command
-                    if add_closing:
-                        svg_path.closed = True
-                    if not svg_path.path_commands:
-                        svg_path.path_commands.append(empty_command)
-                    svg_paths.append(svg_path)
-
-                svg_path = SVGPath([], command.start_pos.copy(), fill=fill, stroke=stroke)
-            else:
-                if svg_path is None:
-                    # Ignore commands until the first moveTo commands
-                    # NOTE: ここ、moveto が存在するまでのコマンドが全無視になってる → 最初に原点への移動（移動しない）コマンドを追加してる？
-                    continue
-
-                if isinstance(command, SVGCommandClose):
-                    if allow_empty or svg_path.path_commands:  # SVGPath contains at least one command
-                        svg_path.closed = True
+            if split_moveto:
+                if isinstance(command, SVGCommandMove):
+                    if svg_path is not None and (allow_empty or svg_path.path_commands):  # SVGPath contains at least one command
+                        # 新しいmovetoに遭遇した時に現在のパスが存在する（または空のパスが許される）場合 
+                        # → 現在のパスをzで閉じて新しいパスに移る。
+                        if add_closing:
+                            svg_path.closed = True
                         if not svg_path.path_commands:
                             svg_path.path_commands.append(empty_command)
                         svg_paths.append(svg_path)
-                    svg_path = None
+
+                    svg_path = SVGPath([], command.start_pos.copy(), fill=fill, stroke=stroke) # パスは必ずmovetoから開始
+                else:
+                    if svg_path is None:
+                        # Ignore commands until the first moveTo commands
+                        # NOTE: ここ、moveto が存在するまでのコマンドが全無視になってる → 最初に原点への移動（移動しない）コマンドを追加してる？
+                        continue
+
+                    if isinstance(command, SVGCommandClose):
+                        if allow_empty or svg_path.path_commands:  # SVGPath contains at least one command
+                            # closeコマンドに遭遇した時に現在のパスが存在する（または空のパスが許される）場合
+                            # → 現在のパスをzで閉じて新しいパス
+                            svg_path.closed = True
+                            if not svg_path.path_commands:
+                                svg_path.path_commands.append(empty_command)
+                            svg_paths.append(svg_path)
+                        svg_path = None
+                    else:
+                        svg_path.path_commands.append(command)
+            else:
+                # split_moveto==False -> x 内の d を一つの path として理解する
+                if svg_path is None: # パスの初期化
+                    svg_path = SVGPath([], command.start_pos.copy(), fill=fill, stroke=stroke)
+                if isinstance(command, SVGCommandClose):
+                    if allow_empty or svg_path.path_commands:  
+                        svg_path.closed = True
+                        if not svg_path.path_commands:
+                            svg_path.path_commands.append(empty_command)
                 else:
                     svg_path.path_commands.append(command)
+                    
         if svg_path is not None and (allow_empty or svg_path.path_commands):  # SVGPath contains at least one command
             if add_closing:
                 svg_path.closed = True
@@ -254,6 +280,7 @@ class SVGPath(SVGGeometry):
         return self
 
     def is_clockwise(self):
+        # 始点と終点の位置のみを使用して向きを決定しているので、制御点はどこにあっても（交差している場合なども）向きに関与しない
         if len(self.path_commands) == 1:
             cmd = self.path_commands[0]
             return cmd.start_pos.tolist() <= cmd.end_pos.tolist()

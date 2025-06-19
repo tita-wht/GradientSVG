@@ -138,9 +138,8 @@ class SVG:
 
         for tag, primitive in primitives.items():
             for x in svg_dom.getElementsByTagName(tag):
-                # FIXME: パスグループを使っている → 暗黙的にパスしか許していない？ グループを定義する
+                # FIXME: パスグループを使っている → 暗黙的にパスしか許していない？ グループを定義する deepsvgでは前処理でpathに変換している
                 svg_path_groups.append(primitive.from_xml(x))
-
         return SVG(svg_path_groups, view_box)
 
     def to_tensor(self, concat_groups=True, PAD_VAL=-1):
