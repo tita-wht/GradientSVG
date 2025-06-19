@@ -176,7 +176,7 @@ class SVGPolygon(SVGPolyline):
         color_attr = self._get_color_attr()
         return '<polygon {} points="{}"/>'.format(color_attr, ' '.join([p.to_str() for p in self.points]))
 
-class SVGPathGroup(SVGGeometry()):
+class SVGPathGroup(SVGGeometry):
     # PathGroupそのものはSVGには存在しない仮想的なクラス
     # pathをまとめておいて置く場所（全てのパスに対して適用する便利関数をまとめたクラス的な）。deepsvgではpathとpathgroupが一緒に使われる想定。
     # NOTE:<g>とは別物と認識する

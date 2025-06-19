@@ -6,3 +6,4 @@ logs/
 gui_data/
 *.ipynb
 NOTE.txt
+dataset/*

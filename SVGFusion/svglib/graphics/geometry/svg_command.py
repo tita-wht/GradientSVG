@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from ...geom import *
-from difflib.tensor import SVGTensor
+from ....difflib.tensor import SVGTensor
 from ...util_fns import get_roots
 from enum import Enum
 import torch

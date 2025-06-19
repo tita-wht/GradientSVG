@@ -37,7 +37,7 @@ class SVGGeometry:
         color_attrs = {}
         color_attrs["fill"] = x.getAttribute("fill") if x.hasAttribute("fill") else "black"
         color_attrs["stroke"] = x.getAttribute("stroke") if x.hasAttribute("stroke") else None
-        color_attrs["stroke_width"] = x.getAttribute("stroke-width") if x.hasAttribute("stroke-width") else ".3"
+        color_attrs["stroke_width"] = x.getAttribute("stroke-width") if x.hasAttribute("stroke-width") else ".3" # NOTE
         color_attrs["fill_opacity"] = x.getAttribute("fill-opacity") if x.hasAttribute("fill-opacity") else "1.0" 
         color_attrs["stroke_opacity"] = x.getAttribute("stroke-opacity") if x.hasAttribute("stroke-opacity") else "1.0"
         return color_attrs

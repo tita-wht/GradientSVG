@@ -1,6 +1,5 @@
 from __future__ import annotations
 from ...geom import *
-import svglib.geom as geom
 import re
 import torch
 from typing import List, Union
@@ -27,18 +26,18 @@ class Orientation:
     CLOCKWISE = 1
 
 
-class Filling: # update me
-    OUTLINE = 0
-    FILL = 1
-    ERASE = 2
+# class Filling: # update me
+#     OUTLINE = 0
+#     FILL = 1
+#     ERASE = 2
 
 # MEMO: fillingが気に入らない。
 # Geometry にfillとstrokeを記述したので、ここからfillingが分かる
 # closedもcommandsの最後がzかどうか、または始点終点の一致によって分かるので@propertyの方が適切 （こっちは後）
 
 class SVGPath(SVGGeometry):
-    def __init__(self, path_commands: List[SVGCommand] = None, origin: Point = None, closed=False):
-        super().__init__()
+    def __init__(self, path_commands: List[SVGCommand] = None, origin: Point = None, closed=False, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.origin = origin or Point(0.)
         self.path_commands = path_commands
         self.closed = closed
@@ -54,13 +53,22 @@ class SVGPath(SVGGeometry):
     @property
     def end_pos(self):
         return self.path_commands[-1].end_pos
+    
+    @property
+    def filling(self):
+        # NOTE: more thinking
+        if self.fill:
+            return True
+        else:
+            return False
 
     def to_group(self, *args, **kwargs):
         from .svg_primitives import SVGPathGroup
         return SVGPathGroup([self], *args, **kwargs)
 
-    def set_filling(self, filling=True):
-        self.filling = Filling.FILL if filling else Filling.ERASE
+    def set_filling(self, fill="black", stroke=None):
+        self.fill = fill
+        self.stroke = stroke
         return self
 
     def __len__(self):
@@ -76,7 +84,7 @@ class SVGPath(SVGGeometry):
         return [self.start_command, *self.path_commands, *close_cmd]
 
     def copy(self):
-        return SVGPath([path_command.copy() for path_command in self.path_commands], self.origin.copy(), self.closed, filling=self.filling)
+        return SVGPath([path_command.copy() for path_command in self.path_commands], self.origin.copy(), self.closed)
 
     @staticmethod
     def _tokenize_path(path_str):
@@ -89,19 +97,15 @@ class SVGPath(SVGGeometry):
 
     @staticmethod
     def from_xml(x: minidom.Element):
-        stroke = x.getAttribute('stroke')
-        dasharray = x.getAttribute('dasharray')
-        stroke_width = x.getAttribute('stroke-width')
-
-        fill = not x.hasAttribute("fill") or not x.getAttribute("fill") == "none"
-
-        filling = Filling.OUTLINE if not x.hasAttribute("filling") else int(x.getAttribute("filling"))
+        color_attrs = SVGGeometry.from_xml_color_attrs(x)
+        fill = color_attrs.get("fill", "black")
+        stroke = color_attrs.get("stroke", None)
 
         s = x.getAttribute('d')
-        return SVGPath.from_str(s, fill=fill, filling=filling)
+        return SVGPath.from_str(s, fill=fill, stroke=stroke)
 
     @staticmethod
-    def from_str(s: str, fill=False, filling=Filling.OUTLINE, add_closing=False):
+    def from_str(s: str, fill="black", stroke=None, add_closing=False):
         path_commands = []
         pos = initial_pos = Point(0.)
         prev_command = None
@@ -110,14 +114,14 @@ class SVGPath(SVGGeometry):
             prev_command = cmd_parsed[-1]
             path_commands.extend(cmd_parsed)
 
-        return SVGPath.from_commands(path_commands, fill=fill, filling=filling, add_closing=add_closing)
+        return SVGPath.from_commands(path_commands, fill=fill, stroke=stroke, add_closing=add_closing)
 
     @staticmethod
     def from_tensor(tensor: torch.Tensor, allow_empty=False):
         return SVGPath.from_commands([SVGCommand.from_tensor(row) for row in tensor], allow_empty=allow_empty)
 
     @staticmethod
-    def from_commands(path_commands: List[SVGCommand], fill=False, filling=Filling.OUTLINE, add_closing=False, allow_empty=False):
+    def from_commands(path_commands: List[SVGCommand], fill="black", stroke=None, add_closing=False, allow_empty=False):
         from .svg_primitives import SVGPathGroup
 
         if not path_commands:
@@ -135,10 +139,11 @@ class SVGPath(SVGGeometry):
                         svg_path.path_commands.append(empty_command)
                     svg_paths.append(svg_path)
 
-                svg_path = SVGPath([], command.start_pos.copy(), filling=filling)
+                svg_path = SVGPath([], command.start_pos.copy(), fill=fill, stroke=stroke)
             else:
                 if svg_path is None:
                     # Ignore commands until the first moveTo commands
+                    # NOTE: ここ、moveto が存在するまでのコマンドが全無視になってる → 最初に原点への移動（移動しない）コマンドを追加してる？
                     continue
 
                 if isinstance(command, SVGCommandClose):
@@ -156,12 +161,12 @@ class SVGPath(SVGGeometry):
             if not svg_path.path_commands:
                 svg_path.path_commands.append(empty_command)
             svg_paths.append(svg_path)
-        return SVGPathGroup(svg_paths, fill=fill)
+        return SVGPathGroup(svg_paths, fill=None, stroke=None)
 
     def __repr__(self):
         return "SVGPath({})".format(" ".join(command.__repr__() for command in self.all_commands()))
 
-    def to_str(self, fill_attr: str="", with_markers=False):
+    def to_str(self, fill_attr:str="", with_markers=False):
         if self._get_color_attr():
             # groupで色が定義されている場合、子要素（このインスタンス）の色定義を優先
             fill_attr = self._get_color_attr()
@@ -245,9 +250,7 @@ class SVGPath(SVGGeometry):
         return self
 
     def duplicate_extremities(self):
-        self.path_commands = [SVGCommandLine(self.start_pos, self.start_pos),
-                              *self.path_commands,
-                              SVGCommandLine(self.end_pos, self.end_pos)]
+        self.path_commands = [SVGCommandLine(self.start_pos, self.start_pos),*self.path_commands,SVGCommandLine(self.end_pos, self.end_pos)]
         return self
 
     def is_clockwise(self):

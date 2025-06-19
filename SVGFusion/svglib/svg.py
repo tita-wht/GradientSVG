@@ -16,9 +16,12 @@ import networkx as nx
 Num = Union[int, float]
 
 from .graphics.geometry.svg_command import SVGCommandBezier
-from .graphics.geometry.svg_path import SVGPath, Filling, Orientation
+from .graphics.geometry.svg_path import SVGPath, Orientation
 from .graphics.geometry.svg_primitives import SVGPathGroup, SVGRectangle, SVGCircle, SVGEllipse, SVGLine, SVGPolyline, SVGPolygon
 from .geom import union_bbox
+
+view_height = "200px"
+view_width = "200px" # NOTE: move to config
 
 
 class SVG:
@@ -27,6 +30,7 @@ class SVG:
             viewbox = Bbox(24)
 
         self.svg_path_groups = svg_path_groups
+        # FIXME: 実際にはパスグループのみではないはずなので、groupsが好ましい
         self.viewbox = viewbox
 
     def __add__(self, other: SVG):
@@ -132,9 +136,10 @@ class SVG:
             "polyline": SVGPolyline, "polygon": SVGPolygon
         }
 
-        for tag, Primitive in primitives.items():
+        for tag, primitive in primitives.items():
             for x in svg_dom.getElementsByTagName(tag):
-                svg_path_groups.append(Primitive.from_xml(x))
+                # FIXME: パスグループを使っている → 暗黙的にパスしか許していない？ グループを定義する
+                svg_path_groups.append(primitive.from_xml(x))
 
         return SVG(svg_path_groups, view_box)
 
@@ -172,9 +177,8 @@ class SVG:
     def save_png(self, file_path):
         cairosvg.svg2png(bytestring=self.to_str(), write_to=file_path)
 
-    def draw(self, fill=False, file_path=None, do_display=True, return_png=False,
-             with_points=False, with_handles=False, with_bboxes=False, with_markers=False, color_firstlast=False,
-             with_moves=True):
+    def draw(self, file_path=None, do_display=True, return_png=False, with_points=False, with_handles=False, with_bboxes=False, with_markers=False, color_firstlast=False, with_moves=True):
+
         if file_path is not None:
             _, file_extension = os.path.splitext(file_path)
             if file_extension == ".svg":
@@ -184,8 +188,12 @@ class SVG:
             else:
                 raise ValueError(f"Unsupported file_path extension {file_extension}")
 
-        svg_str = self.to_str(fill=fill, with_points=with_points, with_handles=with_handles, with_bboxes=with_bboxes,
-                              with_markers=with_markers, color_firstlast=color_firstlast, with_moves=with_moves)
+        svg_str = self.to_str(with_points=with_points, 
+                              with_handles=with_handles, 
+                              with_bboxes=with_bboxes,
+                              with_markers=with_markers, 
+                              color_firstlast=color_firstlast,
+                              with_moves=with_moves)
 
         if do_display:
             ipd.display(ipd.SVG(svg_str))
@@ -225,14 +233,14 @@ class SVG:
                 '</marker>'
                 '</defs>')
 
-    def to_str(self, fill=False, with_points=False, with_handles=False, with_bboxes=False, with_markers=False,
+    def to_str(self, with_points=False, with_handles=False, with_bboxes=False, with_markers=False,
                color_firstlast=False, with_moves=True) -> str:
         viz_elements = self._get_viz_elements(with_points, with_handles, with_bboxes, color_firstlast, with_moves)
-        newline = "\n"
+        # newline = "\n"
         return (
-            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{self.viewbox.to_str()}" height="200px" width="200px">'
+            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{self.viewbox.to_str()}" height="{view_height}" width="{view_width}">\n\n'
             f'{self._markers() if with_markers else ""}'
-            f'{newline.join(svg_path_group.to_str(fill=fill, with_markers=with_markers) for svg_path_group in [*self.svg_path_groups, *viz_elements])}'
+            f'{"".join(svg_path_group.to_str(with_markers=with_markers) for svg_path_group in [*self.svg_path_groups, *viz_elements])}'
             '</svg>')
 
     def _apply_to_paths(self, method, *args, **kwargs):
@@ -497,10 +505,10 @@ class SVG:
         for i, group1 in enumerate(shapes):
             G.add_node(i)
 
-            if self.svg_path_groups[i].path.filling != Filling.OUTLINE:
+            if self.svg_path_groups[i].path.filling != False:
 
                 for j, group2 in enumerate(shapes):
-                    if i != j and self.svg_path_groups[j].path.filling == Filling.FILL:
+                    if i != j and self.svg_path_groups[j].path.fill and not self.svg_path_groups[j].path.stroke:
                         overlap = group1.intersection(group2).area / group1.area
                         if overlap > threshold:
                             G.add_edge(j, i, weight=overlap)
@@ -519,7 +527,7 @@ class SVG:
         root_nodes = [i for i, d in G.in_degree() if d == 0]
 
         for root in root_nodes:
-            if self[root].path.filling == Filling.FILL:
+            if self[root].path.fill and not self[root].path.stroke:
                 current = [root]
 
                 while current:
@@ -528,13 +536,13 @@ class SVG:
                     fill_neighbors, erase_neighbors = [], []
                     for m in G.neighbors(n):
                         if G.in_degree(m) == 1:
-                            if self[m].path.filling == Filling.ERASE:
+                            if not self[m].path.fill and not self[m].path.stroke:
                                 erase_neighbors.append(m)
                             else:
                                 fill_neighbors.append(m)
                     G.remove_node(n)
 
-                    path_group = SVGPathGroup([self[n].path.copy().set_orientation(Orientation.CLOCKWISE)], fill=True)
+                    path_group = SVGPathGroup([self[n].path.copy().set_orientation(Orientation.CLOCKWISE)], fill=None) # NOTE: pathに色がない場合、見えないパスグループができる
                     if erase_neighbors:
                         for n in erase_neighbors:
                             neighbor = self[n].path.copy().set_orientation(Orientation.COUNTER_CLOCKWISE)
@@ -547,7 +555,7 @@ class SVG:
 
         # Add outlines in the end
         for path_group in self.svg_path_groups:
-            if path_group.path.filling == Filling.OUTLINE:
+            if not path_group.path.fill and path_group.path.stroke:
                 path_groups.append(path_group)
 
         return SVG(path_groups)
@@ -570,5 +578,8 @@ class SVG:
             self.svg_path_groups = [self.svg_path_groups[i] for i in indices]
         return self
 
-    def fill_(self, fill=True):
+    def fill_(self, fill="black"):
         return self._apply_to_paths("fill_", fill)
+
+    def stroke_(self, stroke="black", width=1.0):
+        return self._apply_to_paths("stroke_", stroke, width=width)
