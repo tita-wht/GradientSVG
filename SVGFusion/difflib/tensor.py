@@ -13,8 +13,7 @@ class SVGTensor:
         _type_: _description_
     """
     
-    #           0       1         2          3 no use    4 no use   5       6      7 
-    ELEMENTS = ["rect", "circle", "ellipse", "polyline", "polygon", "path", "EOS", "SOS"]
+    ELEMENTS = ["path", "rect", "circle", "ellipse", "line", "polyline", "polygon",  "EOS", "SOS"]
 
     PATH_COMMANDS = ["m", # path moveTo
                      "l", # path lineTo 

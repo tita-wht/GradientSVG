@@ -235,8 +235,10 @@ class SVGCommandLinear(SVGCommand):
         super().__init__(*args, **kwargs)
 
     def to_tensor(self, PAD_VAL=-1):
+        elem_index = SVGTensor.ELEMENTS.index("path")
         cmd_index = SVGTensor.PATH_COMMANDS.index(self.command.value)
-        return torch.tensor([cmd_index,
+        return torch.tensor([elem_index,
+                             cmd_index,
                              *([PAD_VAL] * 5),
                              *self.start_pos.to_tensor(),
                              *([PAD_VAL] * 4),
@@ -309,6 +311,7 @@ class SVGCommandClose(SVGCommandLinear):
 class SVGCommandBezier(SVGCommand):
     def __init__(self, start_pos: Point, control1: Point, control2: Point, end_pos: Point):
         if control2 is None:
+            # NOTE: なんかキモイ。おそらく2次ベジェの代用だが、これでちゃんと代用できているのかわからない。
             control2 = control1.copy()
         super().__init__(SVGCmdEnum.CUBIC_BEZIER, [control1, control2, end_pos], start_pos, end_pos)
 
@@ -335,8 +338,10 @@ class SVGCommandBezier(SVGCommand):
         return SVGCommandBezier(self.start_pos.copy(), self.control1.copy(), self.control2.copy(), self.end_pos.copy())
 
     def to_tensor(self, PAD_VAL=-1):
+        elem_index = SVGTensor.ELEMENTS.index("path")
         cmd_index = SVGTensor.PATH_COMMANDS.index(SVGCmdEnum.CUBIC_BEZIER.value)
-        return torch.tensor([cmd_index,
+        return torch.tensor([elem_index, 
+                             cmd_index,
                              *([PAD_VAL] * 5),
                              *self.start_pos.to_tensor(),
                              *self.control1.to_tensor(),
@@ -474,8 +479,10 @@ class SVGCommandArc(SVGCommand):
                              self.sweep_flag.copy(), self.end_pos.copy())
 
     def to_tensor(self, PAD_VAL=-1):
+        elem_index = SVGTensor.ELEMENTS.index("path")
         cmd_index = SVGTensor.PATH_COMMANDS.index(SVGCmdEnum.ELLIPTIC_ARC.value)
-        return torch.tensor([cmd_index,
+        return torch.tensor([elem_index,
+                             cmd_index,
                              *self.radius.to_tensor(),
                              *self.x_axis_rotation.to_tensor(),
                              *self.large_arc_flag.to_tensor(),

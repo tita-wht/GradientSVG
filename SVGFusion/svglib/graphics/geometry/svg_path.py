@@ -193,9 +193,9 @@ class SVGPath(SVGGeometry):
         return "SVGPath({})".format(" ".join(command.__repr__() for command in self.all_commands()))
 
     def to_str(self, fill_attr:str="", with_markers=False):
-        if self._get_color_attr():
+        if self._get_color_text():
             # groupで色が定義されている場合、子要素（このインスタンス）の色定義を優先
-            fill_attr = self._get_color_attr()
+            fill_attr = self._get_color_text()
         marker_attr = 'marker-start="url(#arrow)"' if with_markers else ''
         command_attrs = " ".join(command.to_str() for command in self.all_commands())
         txt = f'<path {fill_attr} {marker_attr} d="{command_attrs}"></path>'

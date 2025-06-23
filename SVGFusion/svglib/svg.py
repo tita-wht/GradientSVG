@@ -155,6 +155,7 @@ class SVG:
 
     @staticmethod
     def from_tensor(tensor: torch.Tensor, viewbox: Bbox = None, allow_empty=False):
+        # FIXME: 14->15
         if viewbox is None:
             viewbox = Bbox(24)
 

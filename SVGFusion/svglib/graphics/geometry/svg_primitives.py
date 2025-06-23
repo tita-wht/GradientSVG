@@ -12,6 +12,7 @@ import shapely
 import shapely.ops
 import networkx as nx
 
+from ....difflib.tensor import SVGTensor
 from .svg_geometry import SVGGeometry
 
 class SVGEllipse(SVGGeometry):
@@ -26,9 +27,19 @@ class SVGEllipse(SVGGeometry):
         return f'SVGEllipse(c={self.center} r={self.radius})'
 
     def to_str(self, *args, **kwargs):
-        color_attr = self._get_color_attr()
+        color_attr = self._get_color_text()
         return f'<ellipse {color_attr} cx="{self.center.x}" cy="{self.center.y}" rx="{self.radius.x}" ry="{self.radius.y}"/>'
-
+    
+    def to_tensor(self, PAD_VAL=-1):
+        # NOTE: テンソルの形状については要考察。SVGFusionでも、パスのArcの場合などが不明瞭。また、pathとcircleなど、パラメータが異なる場合に同じ列を使用しているのも気になる
+        elem_index = SVGTensor.ELEMENTS.index("ellipse")
+        return torch.tensor([elem_index,
+                             PAD_VAL,
+                             *self.radius.to_tensor(),
+                             *([PAD_VAL]*3),
+                             *self.center.to_tensor(),
+                             *([PAD_VAL] * 6)])
+    
     @classmethod
     def from_xml(_, x: minidom.Element):
         color_attrs = SVGGeometry.from_xml_color_attrs(x)
@@ -57,9 +68,18 @@ class SVGCircle(SVGEllipse):
         return f'SVGCircle(c={self.center} r={self.radius})'
 
     def to_str(self, *args, **kwargs):
-        color_attr = self._get_color_attr()
+        color_attr = self._get_color_text()
         return f'<circle {color_attr} cx="{self.center.x}" cy="{self.center.y}" r="{self.radius.x}"/>'
-
+    
+    def to_tensor(self, PAD_VAL=-1):
+        elem_index = SVGTensor.ELEMENTS.index("circle")
+        return torch.tensor([elem_index,
+                                PAD_VAL,
+                                *self.radius.to_tensor(),
+                                *([PAD_VAL]*3),
+                                *self.center.to_tensor(),
+                                *([PAD_VAL] * 6)])
+    
     @classmethod
     def from_xml(_, x: minidom.Element):
         color_attrs = SVGGeometry.from_xml_color_attrs(x)
@@ -70,19 +90,34 @@ class SVGCircle(SVGEllipse):
 
 
 class SVGRectangle(SVGGeometry):
-    def __init__(self, xy: Point, wh: Size, *args, **kwargs):
+    def __init__(self, xy: Point, wh: Size, rxy: Radius = Radius(0.0,0.0), *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.xy = xy
         self.wh = wh
+        self.rxy = rxy
 
     def __repr__(self):
         return f'SVGRectangle(xy={self.xy} wh={self.wh})'
 
     def to_str(self, *args, **kwargs):
-        color_attr = self._get_color_attr()
-        return f'<rect {color_attr} x="{self.xy.x}" y="{self.xy.y}" width="{self.wh.x}" height="{self.wh.y}"/>'
-
+        color_attr = self._get_color_text()
+        text = f'<rect {color_attr} x="{self.xy.x}" y="{self.xy.y}" width="{self.wh.x}" height="{self.wh.y}"'
+        if self.rxy.x != 0 or self.rxy.y != 0 or self.rxt is not None:
+            text += f' rx="{self.rxy.x}" ry="{self.rxy.y}"'
+        text += '/>'
+        return text
+    
+    def to_tensor(self, PAD_VAL=-1):
+        elem_index = SVGTensor.ELEMENTS.index("rect")
+        return torch.tensor([elem_index,
+                             PAD_VAL,
+                             *([PAD_VAL]*5),
+                             *self.xy.to_tensor(),
+                             *self.wh.to_tensor(),
+                             *self.rxy.to_tensor(),
+                             *([PAD_VAL] * 2)])
+    
     @classmethod
     def from_xml(_, x: minidom.Element):
         color_attrs = SVGGeometry.from_xml_color_attrs(x)
@@ -93,7 +128,8 @@ class SVGRectangle(SVGGeometry):
         if x.hasAttribute("y"):
             xy.pos[1] = float(x.getAttribute("y"))
         wh = Size(float(x.getAttribute("width")), float(x.getAttribute("height")))
-        return SVGRectangle(xy, wh, **color_attrs)
+        rxy = Radius(float(x.getAttribute("rx") or 0.), float(x.getAttribute("ry") or 0.))
+        return SVGRectangle(xy, wh, rxy, **color_attrs)
 
     def to_path(self):
         p0, p1, p2, p3 = self.xy, self.xy + self.wh.xproj(), self.xy + self.wh, self.xy + self.wh.yproj()
@@ -117,9 +153,18 @@ class SVGLine(SVGGeometry):
         return f'SVGLine(xy1={self.start_pos} xy2={self.end_pos})'
 
     def to_str(self, *args, **kwargs):
-        color_attr = self._get_color_attr()
+        color_attr = self._get_color_text()
         return f'<line {color_attr} x1="{self.start_pos.x}" y1="{self.start_pos.y}" x2="{self.end_pos.x}" y2="{self.end_pos.y}"/>'
-
+    
+    def to_tensor(self, PAD_VAL=-1):
+        elem_index = SVGTensor.ELEMENTS.index("line")
+        return torch.tensor([elem_index,
+                             PAD_VAL,
+                             *([PAD_VAL]*5),
+                             *self.start_pos.to_tensor(),
+                             *([PAD_VAL]*4),
+                             *self.end_pos.to_tensor()])
+    
     @classmethod
     def from_xml(_, x: minidom.Element):
         color_attrs = SVGGeometry.from_xml_color_attrs(x)
@@ -142,9 +187,16 @@ class SVGPolyline(SVGGeometry):
         return f'SVGPolyline(points={self.points})'
 
     def to_str(self, *args, **kwargs):
-        color_attr = self._get_color_attr()
+        color_attr = self._get_color_text()
         return '<polyline {} points="{}"/>'.format(color_attr, ' '.join([p.to_str() for p in self.points]))
+    
+    def to_tensor(self, PAD_VAL=-1):
+        # path の L(lineto) のセットとして表現しておく
+        # NOTE: element = "polyline", "polygon" は消滅する
+        paths = self.to_path()
 
+        return torch.cat([p.to_tensor(PAD_VAL=PAD_VAL) for p in paths], dim=0)
+    
     @classmethod
     def from_xml(cls, x: minidom.Element):
         
@@ -162,7 +214,8 @@ class SVGPolyline(SVGGeometry):
     def to_path(self):
         commands = [SVGCommandLine(p1, p2) for p1, p2 in zip(self.points[:-1], self.points[1:])]
         is_closed = self.__class__.__name__ == "SVGPolygon"
-        return SVGPath(commands, closed=is_closed).to_group(fill=self.fill)
+        color_attrs = self.get_color_attrs()
+        return SVGPath(commands, closed=is_closed).to_group(**color_attrs)
 
 
 class SVGPolygon(SVGPolyline):
@@ -173,9 +226,9 @@ class SVGPolygon(SVGPolyline):
         return f'SVGPolygon(points={self.points})'
 
     def to_str(self, *args, **kwargs):
-        color_attr = self._get_color_attr()
+        color_attr = self._get_color_text()
         return '<polygon {} points="{}"/>'.format(color_attr, ' '.join([p.to_str() for p in self.points]))
-
+    
 class SVGPathGroup(SVGGeometry):
     # PathGroupそのものはSVGには存在しない仮想的なクラス
     # pathをまとめておいて置く場所（全てのパスに対して適用する便利関数をまとめたクラス的な）。deepsvgではpathとpathgroupが一緒に使われる想定。
@@ -252,7 +305,7 @@ class SVGPathGroup(SVGGeometry):
         return self
 
     def to_str(self, with_markers=False, *args, **kwargs):
-        fill_attr = self._get_color_attr()
+        fill_attr = self._get_color_text()
         txt = ""
         for path in self.paths:
             txt = txt + path.to_str(fill_attr=fill_attr, with_markers=with_markers)

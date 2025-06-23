@@ -5,6 +5,8 @@ import numpy as np
 import IPython.display as ipd
 from moviepy.editor import ImageClip, concatenate_videoclips, ipython_display
 
+# NOTE: 各クラスのfrom_xml()で％が使用された場合にviewboxから長さを取る関数を作る
+
 
 def make_grid(svgs, num_cols=3, grid_width=24):
     """

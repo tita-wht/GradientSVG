@@ -20,7 +20,7 @@ class SVGGeometry:
         
         # self.all_attrs = None  # 要素の全属性(xml読み込みの場合のみ)
 
-    def _get_color_attr(self):
+    def _get_color_text(self):
         fill_attr = ""
         if self.fill:
             fill_attr += f'fill="{self.fill}" fill-opacity="{self.fill_opacity}" '
@@ -42,6 +42,15 @@ class SVGGeometry:
         color_attrs["stroke_opacity"] = x.getAttribute("stroke-opacity") if x.hasAttribute("stroke-opacity") else "1.0"
         return color_attrs
     
+    def get_color_attrs(self):
+        """SVG要素の色に関する属性を辞書として返す"""
+        return {
+            "fill": self.fill,
+            "stroke": self.stroke,
+            "stroke_width": self.stroke_width,
+            "fill_opacity": self.fill_opacity,
+            "stroke_opacity": self.stroke_opacity
+        }
 
     # @staticmethod
     # def get_all_attrs(x: minidom.Element) -> dict:
