@@ -395,7 +395,7 @@ class Bbox(Geom):
         return Bbox(xy, xy2)
 
     def to_rectangle(self, *args, **kwargs):
-        from .svg_primitive import SVGRectangle
+        from .graphics.geometry.svg_primitives import SVGRectangle
         return SVGRectangle(self.xy, self.wh, *args, **kwargs)
 
     def area(self):
