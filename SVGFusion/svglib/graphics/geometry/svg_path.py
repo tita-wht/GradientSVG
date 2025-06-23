@@ -9,6 +9,7 @@ import shapely.geometry
 import numpy as np
 
 from ...geom import union_bbox
+from ...color import Color
 from .svg_geometry import SVGGeometry
 from .svg_command import SVGCommand, SVGCommandMove, SVGCommandClose, SVGCommandBezier, SVGCommandLine, SVGCommandArc
 
@@ -67,8 +68,8 @@ class SVGPath(SVGGeometry):
         return SVGPathGroup([self], *args, **kwargs)
 
     def set_filling(self, fill="black", stroke=None):
-        self.fill = fill
-        self.stroke = stroke
+        self.fill = Color(fill) if fill is not None else None
+        self.stroke = Color(stroke) if stroke is not None else None
         return self
 
     def __len__(self):
@@ -287,7 +288,7 @@ class SVGPath(SVGGeometry):
 
         det_total = 0.
         for cmd in self.path_commands:
-            det_total += geom.det(cmd.start_pos, cmd.end_pos)
+            det_total += det(cmd.start_pos, cmd.end_pos)
         return det_total >= 0.
 
     def set_orientation(self, orientation):

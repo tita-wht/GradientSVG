@@ -57,7 +57,7 @@ class SVGEllipse(SVGGeometry):
             SVGCommandArc(p2, self.radius, Angle(0.), Flag(0.), Flag(1.), p3),
             SVGCommandArc(p3, self.radius, Angle(0.), Flag(0.), Flag(1.), p0),
         ]
-        return SVGPath(commands, closed=True).to_group(fill=self.fill)
+        return SVGPath(commands, closed=True).to_group(fill=self.fill, stroke=self.stroke, stroke_width=self.stroke_width)
 
 
 class SVGCircle(SVGEllipse):
@@ -139,7 +139,7 @@ class SVGRectangle(SVGGeometry):
             SVGCommandLine(p2, p3),
             SVGCommandLine(p3, p0)
         ]
-        return SVGPath(commands, closed=True).to_group(fill=self.fill)
+        return SVGPath(commands, closed=True).to_group(fill=self.fill, stroke=self.stroke, stroke_width=self.stroke_width)
 
 
 class SVGLine(SVGGeometry):
@@ -174,7 +174,7 @@ class SVGLine(SVGGeometry):
         return SVGLine(start_pos, end_pos, **color_attrs)
 
     def to_path(self):
-        return SVGPath([SVGCommandLine(self.start_pos, self.end_pos)]).to_group(fill=self.fill)
+        return SVGPath([SVGCommandLine(self.start_pos, self.end_pos)]).to_group(fill=self.fill,  stroke=self.stroke, stroke_width=self.stroke_width)
 
 
 class SVGPolyline(SVGGeometry):
@@ -280,8 +280,7 @@ class SVGPathGroup(SVGGeometry):
         self.svg_paths.append(path)
 
     def copy(self):
-        return SVGPathGroup([svg_path.copy() for svg_path in self.svg_paths], self.origin.copy(),
-                            self.color, self.fill, self.dasharray, self.stroke_width, self.opacity)
+        return SVGPathGroup([svg_path.copy() for svg_path in self.svg_paths], self.origin.copy(), self.fill.copy(), self.stroke.copy(), self.stroke_width)
 
     def __repr__(self):
         return "SVGPathGroup({})".format(", ".join(svg_path.__repr__() for svg_path in self.svg_paths))
@@ -297,7 +296,7 @@ class SVGPathGroup(SVGGeometry):
         return viz_elements
 
     def _get_bbox_viz(self):
-        color = "red" if self.color == "black" else self.color
+        color = "red" if self.fill.rgb == [0,0,0] else self.fill.rgb
         bbox = self.bbox().to_rectangle(color=color)
         return bbox
 
@@ -382,9 +381,7 @@ class SVGPathGroup(SVGGeometry):
         return self
 
     def split_paths(self):
-        return [SVGPathGroup([svg_path], self.origin,
-                             self.color, self.fill, self.dasharray, self.stroke_width, self.opacity)
-                for svg_path in self.svg_paths]
+        return [SVGPathGroup([svg_path], self.origin, self.fill, self.stroke, self.stroke_width)                for svg_path in self.svg_paths]
 
     def split(self, n=None, max_dist=None, include_lines=True):
         return self._apply_to_paths("split", n=n, max_dist=max_dist, include_lines=include_lines)

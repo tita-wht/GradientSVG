@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 from ...geom import *
+from ...color import Color
 from xml.dom import minidom
 
 
@@ -11,21 +12,27 @@ class SVGGeometry:
     """
     Reference: https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Basic_Shapes
     """
-    def __init__(self, fill="black", stroke=None, stroke_width=".3", fill_opacity=1.0, stroke_opacity=1.0):
-        self.fill = fill
-        self.fill_opacity = fill_opacity
-        self.stroke = stroke
-        self.stroke_opacity = stroke_opacity
+    def __init__(self, fill="black", stroke=None, stroke_width=".3", fill_opacity=None, stroke_opacity=None):
+        # if None -> color is (-1,-1,-1,-1) , where -1 is padding value
+        if isinstance(fill, Color):
+            self.fill = fill
+        else:
+            self.fill = Color(fill, fill_opacity) if fill is not None else None
+        if isinstance(stroke, Color):
+            self.storke = stroke
+        else:
+            self.stroke = Color(stroke, stroke_opacity) if stroke is not None else None
         self.stroke_width = stroke_width
+        # NOTE: fill/stroke を使用するフラグを出力するべき？
         
         # self.all_attrs = None  # 要素の全属性(xml読み込みの場合のみ)
 
     def _get_color_text(self):
         fill_attr = ""
         if self.fill:
-            fill_attr += f'fill="{self.fill}" fill-opacity="{self.fill_opacity}" '
+            fill_attr += f'fill="{self.fill.to_str()}" '
         if self.stroke:
-            fill_attr += f'stroke="{self.stroke}" stroke-width="{self.stroke_width}" stroke-opacity="{self.stroke_opacity}" '
+            fill_attr += f'stroke="{self.stroke.to_str()}" stroke-width="{self.stroke_width}" '
         return fill_attr
 
     @staticmethod
@@ -48,8 +55,6 @@ class SVGGeometry:
             "fill": self.fill,
             "stroke": self.stroke,
             "stroke_width": self.stroke_width,
-            "fill_opacity": self.fill_opacity,
-            "stroke_opacity": self.stroke_opacity
         }
 
     # @staticmethod
@@ -75,6 +80,6 @@ class SVGGeometry:
         raise NotImplementedError
 
     def fill_(self, fill="blue"):
-        self.fill = fill
+        self.fill = Color(fill)
         self.stroke = None
         return self
