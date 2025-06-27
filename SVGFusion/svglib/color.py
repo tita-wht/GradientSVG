@@ -1,25 +1,32 @@
 from __future__ import annotations
 import numpy as np
-from typing import Union, List, Tuple
+from typing import Union, List, Any
 import torch
 Num = Union[int, float]
-RGBA = Tuple[Num, Num, Num, Num]
-RGB = Tuple[Num, Num, Num]
 float_type = (int, float, np.float32, np.float64)
 
 class Color:
     num_args = 4
 
-    def __init__(self, rgb:List[Num] = None, alpha:Num = None):
+    def __init__(self, rgb:Union[List[Num], str, None] = None, alpha:Num = None):
         # NOTE: alphaのみ0~1
         # 埋め込み時にはかえたほうがいいかもね
         if rgb is None:
             rgb = [0, 0, 0] # black
+        elif isinstance(rgb, str):
+            rgb, a = Color.from_str(rgb)
+            if alpha is None:
+                alpha = a
         elif len(rgb) > 3:
             rgb = rgb[:3]  # truncate to first 3 elements
         self.rgb = np.array(rgb, dtype=np.float32)
+
         alpha = alpha if alpha is not None else 1.0
         self.a = np.array(alpha, dtype=np.float32)
+        # MEMO: alphaについて
+        # 引数のalphaが有効な場合 → alpha
+        # rgbaで指定される場合    → alpha > a
+        # rgbaもalphaもない場合   → 1.0 (完全に不透明)
 
     @property
     def r(self):
@@ -62,7 +69,17 @@ class Color:
         return self
     
     @staticmethod
-    def from_hex(hex_color: str):
+    def from_str(str:str):
+        if str.startswith("#"):
+            rgb, a = Color._from_hex(str)
+        elif str.startswith("rgb"):
+            rgb, a = Color._from_color_list(str)
+        else:
+            rgb, a = Color._from_color_name(str)
+        return rgb, a
+    
+    @staticmethod
+    def _from_hex(hex_color: str):
         """Convert a hex color string to an RGB color."""
         if hex_color.startswith('#'):
             hex_color = hex_color[1:]
@@ -77,20 +94,20 @@ class Color:
         else:
             raise ValueError("Invalid hex color format")
         rgb = [r, g, b]
-        return Color(rgb, 1.0)
+        return (rgb, 1.0)
     
     @staticmethod
-    def from_color_name(color_name: str):
+    def _from_color_name(color_name: str):
         """Convert a color name to an RGB color."""
         color_name = color_name.lower()
         if color_name in COLOR_RGB_DICT:
             rgb = COLOR_RGB_DICT[color_name]
-            return Color(list(rgb), 1.0)
+            return (list(rgb), 1.0)
         else:
             raise ValueError(f"Color name '{color_name}' not recognized.")
         
     @staticmethod
-    def from_color_str(str: str):
+    def _from_color_list(str: str):
         # rgb(r,g,b) or rgba(r,g,b,a)
         s = str.strip().lower()
         if s.startswith("rgba"):
@@ -98,17 +115,13 @@ class Color:
             if len(values) != 4:
                 raise ValueError("Invalid rgba color string")
             r, g, b, a = [float(v.strip()) for v in values]
-            return Color([r, g, b], a)
+            return ([r, g, b], a)
         elif s.startswith("rgb"):
             values = s[s.find("(")+1:s.find(")")].split(",")
             if len(values) != 3:
                 raise ValueError("Invalid rgb color string")
             r, g, b = [float(v.strip()) for v in values]
-            return Color([r, g, b], 1.0)
-        elif s.startswith("#"):
-            return Color.from_hex(s)
-        else:
-            return Color.from_color_name(s)
+            return ([r, g, b], 1.0)
     
 
 COLOR_RGB_DICT = {

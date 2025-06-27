@@ -43,6 +43,7 @@ class SVGTensor:
         CONTROL1 = slice(9, 11)
         CONTROL2 = slice(11, 13)
         END_POS = slice(13, 15)
+        RGBA = slice(15,18)
 
     class IndexArgs: # CMD_ARGS_MASK indices 
         RADIUS = slice(0, 2)
@@ -59,8 +60,10 @@ class SVGTensor:
     all_arg_keys = [*arg_keys[:4], "start_pos", *arg_keys[4:]]
     elem_keys = ["elements", "commands", *arg_keys]
     all_elem_keys = ["elements", "commands", *all_arg_keys]
+    matrix_keys = [*all_elem_keys, "rgba"]
 
-    def __init__(self, elements, commands, radius, x_axis_rot, large_arc_flg, sweep_flg, control1, control2, end_pos, seq_len=None, label=None, PAD_VAL=-1, ARGS_DIM=256, filling=0):
+    def __init__(self, elements, commands, radius, x_axis_rot, large_arc_flg, sweep_flg, control1, control2, end_pos, rgba=None, seq_len=None, label=None, PAD_VAL=-1, ARGS_DIM=256):
+        # NOTE: all args are torch.tensor
 
         self.elements = elements.reshape(-1, 1).float()
         self.commands = commands.reshape(-1, 1).float()
@@ -77,13 +80,14 @@ class SVGTensor:
         self.seq_len = torch.tensor(len(elements)) if seq_len is None else seq_len
         self.label = label
 
+        self.rgba = rgba if rgba is not None else torch.tensor([0,0,0,0], dtype=torch.float32)
+
         self.PAD_VAL = PAD_VAL
         self.ARGS_DIM = ARGS_DIM
 
         self.sos_token = torch.Tensor([self.ELEMENTS.index("SOS")]).unsqueeze(-1)
         self.eos_token = self.pad_token = torch.Tensor([self.ELEMENTS.index("EOS")]).unsqueeze(-1)
 
-        self.filling = filling
 
     @property
     def start_pos(self):
@@ -95,24 +99,40 @@ class SVGTensor:
         ])
 
     @staticmethod
-    def from_data(data, *args, **kwargs):
+    def from_data(data, rgba=None, *args, **kwargs):
         # sample_data = torch.tensor([
         #         [0, 0, 10, 20, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6],  # 1行目: rect
         #         [1, 1, 15, 25, 0, 0, 0, 0, 0, 5, 6, 7, 8, 9, 10], # 2行目: circle
         #         ], dtype=torch.float32)
-        return SVGTensor(data[:, SVGTensor.Index.ELEMENT],
-                         data[:, SVGTensor.Index.COMMAND], 
-                         data[:, SVGTensor.Index.RADIUS], 
-                         data[:, SVGTensor.Index.X_AXIS_ROT],
-                         data[:, SVGTensor.Index.LARGE_ARC_FLG], 
-                         data[:, SVGTensor.Index.SWEEP_FLG], 
-                         data[:, SVGTensor.Index.CONTROL1],
-                         data[:, SVGTensor.Index.CONTROL2], 
-                         data[:, SVGTensor.Index.END_POS], 
-                         *args, **kwargs)
+        if data.size(-1) == 15:
+            return SVGTensor(data[:, SVGTensor.Index.ELEMENT],
+                            data[:, SVGTensor.Index.COMMAND], 
+                            data[:, SVGTensor.Index.RADIUS], 
+                            data[:, SVGTensor.Index.X_AXIS_ROT],
+                            data[:, SVGTensor.Index.LARGE_ARC_FLG], 
+                            data[:, SVGTensor.Index.SWEEP_FLG], 
+                            data[:, SVGTensor.Index.CONTROL1],
+                            data[:, SVGTensor.Index.CONTROL2], 
+                            data[:, SVGTensor.Index.END_POS], 
+                            rgba,
+                            *args, **kwargs)
+        elif data.size(-1) == 18:
+             return SVGTensor(data[:, SVGTensor.Index.ELEMENT],
+                            data[:, SVGTensor.Index.COMMAND], 
+                            data[:, SVGTensor.Index.RADIUS], 
+                            data[:, SVGTensor.Index.X_AXIS_ROT],
+                            data[:, SVGTensor.Index.LARGE_ARC_FLG], 
+                            data[:, SVGTensor.Index.SWEEP_FLG], 
+                            data[:, SVGTensor.Index.CONTROL1],
+                            data[:, SVGTensor.Index.CONTROL2], 
+                            data[:, SVGTensor.Index.END_POS], 
+                            data[:, SVGTensor.Index.RGBA]
+                            *args, **kwargs)   
+        else:
+            raise ValueError(f"Invalid tensor row length: {data.size(-1)}. Expected 15 or 18(with rgba color).")     
 
     @staticmethod
-    def from_cmd_args(elements, commands, args, *nargs, **kwargs): # MEMO: 呼び出し注意
+    def from_cmd_args(elements, commands, args, rgba=None, *nargs, **kwargs): # MEMO: 呼び出し注意
         return SVGTensor(elements, 
                          commands, 
                          args[:, SVGTensor.IndexArgs.RADIUS], 
@@ -122,18 +142,27 @@ class SVGTensor:
                          args[:, SVGTensor.IndexArgs.CONTROL1],
                          args[:, SVGTensor.IndexArgs.CONTROL2], 
                          args[:, SVGTensor.IndexArgs.END_POS], 
+                         rgba,
                          *nargs, **kwargs)
 
     def get_data(self, keys):
+        return torch.cat([self.__getattribute__(key) for key in keys], dim=-1)
+    
+    def get_matrix(self, keys):
         return torch.cat([self.__getattribute__(key) for key in keys], dim=-1)
 
     @property
     def data(self):
         return self.get_data(self.all_elem_keys)
 
+    @property
+    def matrix(self):
+        # NOTE: data + rgba
+        return self.get_matrix(self.matrix_keys)
+
     def copy(self):
-        return SVGTensor(*[self.__getattribute__(key).clone() for key in self.cmd_arg_keys],
-                         seq_len=self.seq_len.clone(), label=self.label, PAD_VAL=self.PAD_VAL, ARGS_DIM=self.ARGS_DIM, filling=self.filling)
+        return SVGTensor(*[self.__getattribute__(key).clone() for key in self.matrix_keys],
+                         seq_len=self.seq_len.clone(), label=self.label, PAD_VAL=self.PAD_VAL, ARGS_DIM=self.ARGS_DIM)
 
     def add_sos(self): # NOTE: pad_val = -1 (in paper, PAD_VAL = 0)
         self.elements = torch.cat([self.sos_token, self.elements])
@@ -256,7 +285,7 @@ class SVGTensor:
         ], device=device)
 
         commands, pos = self.commands.reshape(-1).long(), self.get_data(self.all_position_keys).reshape(-1, 4, 2)
-        inds = (commands == self.COMMANDS_SIMPLIFIED.index("l")) | (commands == self.COMMANDS_SIMPLIFIED.index("c"))
+        inds = (commands == self.PATH_COMMANDS.index("l")) | (commands == self.PATH_COMMANDS.index("c"))
         commands, pos = commands[inds], pos[inds]
 
         Z_coeffs = torch.matmul(Q[commands], pos)

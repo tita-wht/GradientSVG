@@ -542,7 +542,7 @@ class SVG:
                                 fill_neighbors.append(m)
                     G.remove_node(n)
 
-                    path_group = SVGPathGroup([self[n].path.copy().set_orientation(Orientation.CLOCKWISE)], fill=None) # NOTE: pathに色がない場合、見えないパスグループができる
+                    path_group = SVGPathGroup([self[n].path.copy().set_orientation(Orientation.CLOCKWISE)], fill=None, stroke=None) # NOTE: pathに色がない場合、見えないパスグループができる
                     if erase_neighbors:
                         for n in erase_neighbors:
                             neighbor = self[n].path.copy().set_orientation(Orientation.COUNTER_CLOCKWISE)
