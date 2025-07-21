@@ -17,7 +17,7 @@ class SVGGeometry:
         if isinstance(fill, Color):
             self.fill = fill
         else:
-            self.fill = Color(fill, fill_opacity) if fill is not None else None
+            self.fill = Color(fill, fill_opacity) if fill is not None else None # NOTE: fillに文字解析
         if isinstance(stroke, Color):
             self.storke = stroke
         else:
@@ -72,6 +72,15 @@ class SVGGeometry:
 
     def to_path(self):
         raise NotImplementedError
+    
+    def to_tensor(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def to_color_tensor(self, PAD_VAL=-1, *args, **kwargs):
+        fill_tensor = self.fill.to_tensor() if self.fill is not None else torch.tensor([PAD_VAL, PAD_VAL, PAD_VAL, PAD_VAL], dtype=torch.float32)
+        stroke_tensor = self.stroke.to_tensor() if self.stroke is not None else torch.tensor([PAD_VAL, PAD_VAL, PAD_VAL, PAD_VAL], dtype=torch.float32)
+                      
+        return fill_tensor, stroke_tensor
 
     def copy(self):
         raise NotImplementedError

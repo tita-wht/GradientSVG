@@ -280,7 +280,9 @@ class SVGPathGroup(SVGGeometry):
         self.svg_paths.append(path)
 
     def copy(self):
-        return SVGPathGroup([svg_path.copy() for svg_path in self.svg_paths], self.origin.copy(), self.fill.copy(), self.stroke.copy(), self.stroke_width)
+        fill = self.fill.copt() if self.fill else None
+        stroke = self.stroke.copy() if self.stroke else None
+        return SVGPathGroup([svg_path.copy() for svg_path in self.svg_paths], self.origin.copy(), fill, stroke, self.stroke_width)
 
     def __repr__(self):
         return "SVGPathGroup({})".format(", ".join(svg_path.__repr__() for svg_path in self.svg_paths))
@@ -313,6 +315,27 @@ class SVGPathGroup(SVGGeometry):
 
     def to_tensor(self, PAD_VAL=-1):
         return torch.cat([p.to_tensor(PAD_VAL=PAD_VAL) for p in self.svg_paths], dim=0)
+    
+    def to_color_tensor(self, PAD_VAL=-1):
+        # path level colors -> group level colors
+
+        g_fill = self.fill.to_tensor() if self.fill is not None else torch.tensor([PAD_VAL, PAD_VAL, PAD_VAL, PAD_VAL], dtype=torch.float32)
+        g_stroke = self.stroke.to_tensor() if self.stroke is not None else torch.tensor([PAD_VAL, PAD_VAL, PAD_VAL, PAD_VAL], dtype=torch.float32)
+        
+        fill_tensors = []
+        stroke_tensors = []
+        for p in self.paths:
+            fill_tensor, stroke_tensor = p.to_color_tensor(PAD_VAL=PAD_VAL)
+
+            if torch.all(fill_tensor == PAD_VAL):
+                fill_tensor = g_fill
+            if torch.all(stroke_tensor == PAD_VAL):
+                stroke_tensor = g_stroke
+
+            fill_tensors.append(fill_tensor)
+            stroke_tensors.append(stroke_tensor)
+
+        return torch.stack(fill_tensors, dim=0), torch.stack(stroke_tensors, dim=0)
 
     def _apply_to_paths(self, method, *args, **kwargs):
         for path in self.svg_paths:

@@ -14,18 +14,16 @@ class Color:
         if rgb is None:
             rgb = [0, 0, 0] # black
         elif isinstance(rgb, str):
-            rgb, a = Color.from_str(rgb)
-            if alpha is None:
-                alpha = a
+            rgb, alpha = Color.from_str(rgb)
         elif len(rgb) > 3:
             rgb = rgb[:3]  # truncate to first 3 elements
         self.rgb = np.array(rgb, dtype=np.float32)
 
         alpha = alpha if alpha is not None else 1.0
-        self.a = np.array(alpha, dtype=np.float32)
+        self.a = np.float32(alpha)
         # MEMO: alphaについて
         # 引数のalphaが有効な場合 → alpha
-        # rgbaで指定される場合    → alpha > a
+        # rgbaで指定される場合    → alpha -> a
         # rgbaもalphaもない場合   → 1.0 (完全に不透明)
 
     @property
@@ -39,21 +37,21 @@ class Color:
         return self.rgba[2]
     @property
     def rgba(self) -> List[Num]:
-        return np.concatenate((self.rgb, self.alpha)).tolist() 
+        return np.concatenate((self.rgb, [self.a])) 
 
     def __repr__(self):
-        str = f"{self.rgba[0]:.3f} {self.rgba[1]:.3f} {self.rgba[2]:.3f} {self.alpha[0]:.3f}"
-        return f"Color({self.rgba})"
+        txt = f"{self.rgba[0]:.3f} {self.rgba[1]:.3f} {self.rgba[2]:.3f} {self.rgba[3]:.3f}"
+        return f"Color({txt})"
 
     def copy(self):
-        return Color(self.rgb.copy(), self.alpha.copy())
+        return Color(self.rgb.copy(), self.a.copy())
 
     def to_str(self):
         rgb = self.rgb.round().clip(min=0, max=255)
         if self.a == 1.0:
-            str = f"rgb({rgb[0]}, {rgb[1]}, {rgb[2]})"
+            str = f"rgb({rgb[0]},{rgb[1]},{rgb[2]})"
         else:
-            str = f"rgba({rgb[0]}, {rgb[1]}, {rgb[2]}, {self.a})"
+            str = f"rgba({rgb[0]},{rgb[1]},{rgb[2]},{self.a})"
         return str
 
     def to_tensor(self):
@@ -76,7 +74,7 @@ class Color:
             rgb, a = Color._from_color_list(str)
         else:
             rgb, a = Color._from_color_name(str)
-        return rgb, a
+        return Color(rgb, a)
     
     @staticmethod
     def _from_hex(hex_color: str):

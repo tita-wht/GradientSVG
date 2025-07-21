@@ -142,13 +142,45 @@ class SVG:
                 svg_path_groups.append(primitive.from_xml(x))
         return SVG(svg_path_groups, view_box)
 
-    def to_tensor(self, concat_groups=True, PAD_VAL=-1):
+    def to_tensor(self, concat_groups=True, PAD_VAL=-1, with_rgba=True):
         group_tensors = [p.to_tensor(PAD_VAL=PAD_VAL) for p in self.svg_path_groups]
+
+        if with_rgba:
+            fill_tensor, stroke_tensor = self.to_color_tensor(concat_groups=False) # (基本)groupごとに一つの色
+
+            color_tensors = []
+            for i in range(fill_tensor.size(0)):
+                # FIXME: 実際にはfillingなどのフラグを用いたほうが確実。
+                # 今回はfill/strokeの一方しか使用されないと仮定している。
+                color_tensor = torch.ones(1,4)*PAD_VAL
+                color_tensor = fill_tensor[i] if not torch.all(fill_tensor[i]==PAD_VAL) else color_tensor
+                color_tensor = stroke_tensor[i] if not torch.all(stroke_tensor[i]==PAD_VAL) else color_tensor
+                for j in range(len(group_tensors)):
+                    s = group_tensors[j].size(0)
+                    color_tensors.append(color_tensor.repeat(s, 1))
+            
+            for i in range(len(group_tensors)):
+                group_tensors[i] = torch.cat((group_tensors[i], color_tensors[i]), dim=1)
+            # group_tensors = torch.cat((group_tensors, color_tensors), dim=1)
 
         if concat_groups:
             return torch.cat(group_tensors, dim=0)
 
         return group_tensors
+
+    def to_color_tensor(self, concat_groups=True, PAD_VAL=-1):
+        fill_tensors = []
+        stroke_tensors = []
+        for pg in self.svg_path_groups:
+            fill_tensor, stroke_tensor = pg.to_color_tensor(PAD_VAL=PAD_VAL)
+            fill_tensors.append(fill_tensor)
+            stroke_tensors.append(stroke_tensor)
+
+        if concat_groups:
+            return torch.cat(fill_tensors, dim=0), torch.cat(stroke_tensors, dim=0)
+
+        return fill_tensor, stroke_tensor
+
 
     def to_fillings(self):
         return [p.path.filling for p in self.svg_path_groups]

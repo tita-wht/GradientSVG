@@ -79,3 +79,24 @@ def get_length_distribution(p, normalize=True):
         length_distr = length_distr / length_distr[-1]
 
     return length_distr
+
+def positional_encoding(length, dim):
+    """
+    Generate sinusoidal positional encoding.
+
+    Args:
+        length (int): Number of positions.
+        dim (int): Dimension of the encoding.
+
+    Returns:
+        torch.Tensor: Positional encoding of shape (length, dim).
+    """
+    position = torch.arange(length, dtype=torch.float32).unsqueeze(1)
+    div_term = torch.exp(torch.arange(0, dim, 2, dtype=torch.float32) * (-torch.log(torch.tensor(10000.0)) / dim))
+    pe = torch.zeros(length, dim)
+    pe[:, 0::2] = torch.sin(position * div_term)
+    if dim % 2 == 1:
+        pe[:, 1::2] = torch.cos(position * div_term)[:, :pe[:, 1::2].shape[1]]
+    else:
+        pe[:, 1::2] = torch.cos(position * div_term)
+    return pe

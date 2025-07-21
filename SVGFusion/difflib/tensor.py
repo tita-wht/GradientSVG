@@ -1,10 +1,18 @@
 from __future__ import annotations
 import torch
 import torch.utils.data
+from .utils import positional_encoding
 from typing import Union
 Num = Union[int, float]
 
 # NOTE: パディングの値が-1の場合、SOS追加によって、SOSの次トークンの初期位置が-1になる。
+
+
+class Filling: 
+    STROKE = 0
+    FILL = 1
+    ERASE = 2
+    # FILL_AND_STROKE = 3
 
 class SVGTensor: 
     """論文中 S_(i,j) を示す 
@@ -43,7 +51,7 @@ class SVGTensor:
         CONTROL1 = slice(9, 11)
         CONTROL2 = slice(11, 13)
         END_POS = slice(13, 15)
-        RGBA = slice(15,18)
+        RGBA = slice(15,19)
 
     class IndexArgs: # CMD_ARGS_MASK indices 
         RADIUS = slice(0, 2)
@@ -80,6 +88,7 @@ class SVGTensor:
         self.seq_len = torch.tensor(len(elements)) if seq_len is None else seq_len
         self.label = label
 
+        # self.filling = filling # NOTE: FILL_AND_STROKEの時 rgbaステータスが一つしかないことに注意。現状は一要素に二つ以上の色を考えないこと
         self.rgba = rgba if rgba is not None else torch.tensor([0,0,0,0], dtype=torch.float32)
 
         self.PAD_VAL = PAD_VAL
@@ -88,6 +97,19 @@ class SVGTensor:
         self.sos_token = torch.Tensor([self.ELEMENTS.index("SOS")]).unsqueeze(-1)
         self.eos_token = self.pad_token = torch.Tensor([self.ELEMENTS.index("EOS")]).unsqueeze(-1)
 
+
+    def get_data(self, keys):
+        # print([self.__getattribute__(key) for key in keys])
+        return torch.cat([self.__getattribute__(key) for key in keys], dim=-1)
+
+    @property
+    def data(self):
+        return self.get_data(self.all_elem_keys)
+
+    @property
+    def matrix(self):
+        # NOTE: data + rgba
+        return self.get_data(self.matrix_keys)
 
     @property
     def start_pos(self):
@@ -104,7 +126,7 @@ class SVGTensor:
         #         [0, 0, 10, 20, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6],  # 1行目: rect
         #         [1, 1, 15, 25, 0, 0, 0, 0, 0, 5, 6, 7, 8, 9, 10], # 2行目: circle
         #         ], dtype=torch.float32)
-        if data.size(-1) == 15:
+        if data.size(-1) == 15 and rgba:
             return SVGTensor(data[:, SVGTensor.Index.ELEMENT],
                             data[:, SVGTensor.Index.COMMAND], 
                             data[:, SVGTensor.Index.RADIUS], 
@@ -116,7 +138,7 @@ class SVGTensor:
                             data[:, SVGTensor.Index.END_POS], 
                             rgba,
                             *args, **kwargs)
-        elif data.size(-1) == 18:
+        elif data.size(-1) == 19:
              return SVGTensor(data[:, SVGTensor.Index.ELEMENT],
                             data[:, SVGTensor.Index.COMMAND], 
                             data[:, SVGTensor.Index.RADIUS], 
@@ -126,10 +148,10 @@ class SVGTensor:
                             data[:, SVGTensor.Index.CONTROL1],
                             data[:, SVGTensor.Index.CONTROL2], 
                             data[:, SVGTensor.Index.END_POS], 
-                            data[:, SVGTensor.Index.RGBA]
+                            data[:, SVGTensor.Index.RGBA],
                             *args, **kwargs)   
         else:
-            raise ValueError(f"Invalid tensor row length: {data.size(-1)}. Expected 15 or 18(with rgba color).")     
+            raise ValueError(f"Invalid tensor row length: {data.size(-1)}. Expected 15 or 19(with rgba color).")     
 
     @staticmethod
     def from_cmd_args(elements, commands, args, rgba=None, *nargs, **kwargs): # MEMO: 呼び出し注意
@@ -144,21 +166,6 @@ class SVGTensor:
                          args[:, SVGTensor.IndexArgs.END_POS], 
                          rgba,
                          *nargs, **kwargs)
-
-    def get_data(self, keys):
-        return torch.cat([self.__getattribute__(key) for key in keys], dim=-1)
-    
-    def get_matrix(self, keys):
-        return torch.cat([self.__getattribute__(key) for key in keys], dim=-1)
-
-    @property
-    def data(self):
-        return self.get_data(self.all_elem_keys)
-
-    @property
-    def matrix(self):
-        # NOTE: data + rgba
-        return self.get_matrix(self.matrix_keys)
 
     def copy(self):
         return SVGTensor(*[self.__getattribute__(key).clone() for key in self.matrix_keys],
@@ -314,4 +321,11 @@ class SVGTensor:
         matching = d.argmin(dim=-1)
 
         return p[matching]
+
+    def embed(self, ):
+        matrix = self.matrix
+        Dm = matrix.size(0)
+        dim = matrix.size(1)
+        pe = positional_encoding(Dm, dim)
+        return matrix + pe
 
