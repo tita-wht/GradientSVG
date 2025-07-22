@@ -175,7 +175,7 @@ class SVG:
 
         for tag, primitive in PRIMITIVES.items():
             for x in svg_dom.getElementsByTagName(tag):
-                svg_path_groups.append(primitive.from_xml(x, rules_dict=rules)) # FIXME: プリミティブ全体へrules_dictを追加
+                svg_path_groups.append(primitive.from_xml(x, rules_dict=rules, defs=defs)) # FIXME: プリミティブ全体へrules_dictを追加
         return SVG(svg_path_groups, view_box, rules=rules, defs=defs)
 
     @staticmethod

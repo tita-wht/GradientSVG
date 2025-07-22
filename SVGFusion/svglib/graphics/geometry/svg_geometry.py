@@ -12,10 +12,12 @@ from xml.dom import minidom
 # あるいはgradient自体がcolorの継承になるなど。
 
 class SVGGeometry:
+    # ATTRS = ["id", "class", "style", "transform"]
+    ATTRS = ["fill", "stroke", "stroke-width", "fill-opacity", "stroke-opacity"]
     """
     Reference: https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Basic_Shapes
     """
-    def __init__(self, fill="black", stroke=None, stroke_width=.3, fill_opacity=None, stroke_opacity=None, *args, **kwargs):
+    def __init__(self, fill="black", stroke=None, stroke_width=.3, fill_opacity=None, stroke_opacity=None, id=None, *args, **kwargs):
         # if None -> color is (-1,-1,-1,-1) , where -1 is padding value
         self.fill = None
         if isinstance(fill, Color):
@@ -34,6 +36,11 @@ class SVGGeometry:
             self.stroke = Color(stroke, stroke_opacity) if stroke is not None else None
         self.stroke_width = stroke_width
         # NOTE: fill/stroke を使用するフラグを出力するべき？
+
+        if id:
+            self.id = id
+            self.ATTRS.append("id")
+            self.style_from_id(kwargs.get("rules_dict", {}), id)
         
         # self.all_attrs = None  # 要素の全属性(xml読み込みの場合のみ)
 
@@ -108,4 +115,17 @@ class SVGGeometry:
     def fill_(self, fill="blue"):
         self.fill = Color(fill)
         self.stroke = None
+        return self
+
+    def style_from_id(self, rules_dict:dict, id_name: str):
+        # 自身のid属性の値と一致するidセレクタを<style>中から探し、定義された属性をインスタンスに適用する。
+        if not id_name.startswith("#"):
+            id_name = "#" + id_name
+        if id_name in rules_dict:
+            print("do")
+            for attr, value in rules_dict[id_name].items():
+                if hasattr(self, attr):
+                    setattr(self, attr, value)
+                else:
+                    setattr(self, attr, value)
         return self

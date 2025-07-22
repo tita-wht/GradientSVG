@@ -102,7 +102,8 @@ class SVGRectangle(SVGGeometry):
 
     def to_str(self, *args, **kwargs):
         color_attr = self._get_color_text()
-        text = f'<rect {color_attr} x="{self.xy.x}" y="{self.xy.y}" width="{self.wh.x}" height="{self.wh.y}"'
+        id_attr = f'id="{self.id}" ' if hasattr(self, 'id') else ''
+        text = f'<rect {id_attr} {color_attr} x="{self.xy.x}" y="{self.xy.y}" width="{self.wh.x}" height="{self.wh.y}"'
         if self.rxy.x != 0 or self.rxy.y != 0 or self.rxt is not None:
             text += f' rx="{self.rxy.x}" ry="{self.rxy.y}"'
         text += '/>\n'
@@ -120,6 +121,7 @@ class SVGRectangle(SVGGeometry):
     
     @classmethod
     def from_xml(_, x: minidom.Element, rules_dict=None, *args, **kwargs):
+        id_name = x.getAttribute("id") if x.hasAttribute("id") else None # FIXME: すべてのプリミティブが同じ動作。上位クラスに移動するかよく考える。or装飾を活用してみる。
         color_attrs = SVGGeometry.from_xml_color_attrs(x)
 
         xy = Point(0.)
@@ -129,7 +131,7 @@ class SVGRectangle(SVGGeometry):
             xy.pos[1] = float(x.getAttribute("y"))
         wh = Size(float(x.getAttribute("width")), float(x.getAttribute("height")))
         rxy = Radius(float(x.getAttribute("rx") or 0.), float(x.getAttribute("ry") or 0.))
-        return SVGRectangle(xy, wh, rxy, **color_attrs)
+        return SVGRectangle(xy, wh, rxy, **color_attrs, id=id_name)
 
     def to_path(self):
         p0, p1, p2, p3 = self.xy, self.xy + self.wh.xproj(), self.xy + self.wh, self.xy + self.wh.yproj()
