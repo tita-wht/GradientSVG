@@ -168,11 +168,10 @@ class SVG:
         rules = SVG.get_style_rules(style_str)
 
         defs = []
-        if svg_defs:
-            for tag, primitive in DEFINITIONS.items():
-                for x in svg_defs.getElementsByTagName(tag):
-                    defs.append(primitive.from_xml(x, rules_dict=rules))
-                    print(tag)
+        for tag, primitive in DEFINITIONS.items():
+            for x in svg_dom.getElementsByTagName(tag):
+                defs.append(primitive.from_xml(x, rules_dict=rules))
+                print(tag)
 
         for tag, primitive in PRIMITIVES.items():
             for x in svg_dom.getElementsByTagName(tag):
@@ -310,23 +309,47 @@ class SVG:
         return viz_elements
 
     def _markers(self):
-        return ('<defs>'
-                '<marker id="arrow" viewBox="0 0 10 10" markerWidth="4" markerHeight="4" refX="0" refY="3" orient="auto" markerUnits="strokeWidth">'
+        return ('<marker id="arrow" viewBox="0 0 10 10" markerWidth="4" markerHeight="4" refX="0" refY="3" orient="auto" markerUnits="strokeWidth">'
                 '<path d="M0,0 L0,6 L9,3 z" fill="#f00" />'
-                '</marker>'
-                '</defs>')
+                '</marker>')
+
+    def _defs_str(self):
+        defs_str = ""
+        for d in self.defs:
+            defs_str += d.to_str()
+        return defs_str
+    
+    def _style_str(self):
+        style_str = ""
+        for selector, attrs in self.rules.items():
+            style_str += f"{selector} {{\n"
+            for attr, value in attrs.items():
+                style_str += f"\t{attr}: {value};\n"
+            style_str += "}\n"
+        return style_str
 
     def to_str(self, with_points=False, with_handles=False, with_bboxes=False, with_markers=False, color_firstlast=False, with_moves=True) -> str:
         viz_elements = self._get_viz_elements(with_points, with_handles, with_bboxes, color_firstlast, with_moves)
-        # TODO: ここ、defsとstylesはSVGに外に出してクラス化するのが無難。
-        # defs = self.defs
-        # style = self.rules
-        # newline = "\n"
-        return (
-            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{self.viewbox.to_str()}" height="{view_height}" width="{view_width}">\n\n'
-            f'{self._markers() if with_markers else ""}'
-            f'{"".join(svg_path_group.to_str(with_markers=with_markers) for svg_path_group in [*self.svg_path_groups, *viz_elements])}'
-            '</svg>')
+
+        # ヘッダ
+        txt = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{self.viewbox.to_str()}" height="{view_height}" width="{view_width}">\n\n'
+        # defs
+        if self.defs or with_markers:
+            txt += "<defs>\n" 
+            txt += f'{self._markers() if with_markers else ""}'
+            txt += self._defs_str()
+            txt += "</defs>\n"
+        # style
+        if self.rules:
+            txt += '<style type="text/css">\n'
+            txt += self._style_str()
+            txt += '</style>\n'
+        txt += "\n"
+        # body
+        txt += f'{"".join(svg_path_group.to_str(with_markers=with_markers) for svg_path_group in [*self.svg_path_groups, *viz_elements])}'
+        txt += '</svg>'
+        
+        return txt
 
     def _apply_to_paths(self, method, *args, **kwargs):
         for path_group in self.svg_path_groups:

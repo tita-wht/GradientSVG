@@ -5,21 +5,31 @@
 from __future__ import annotations
 from ...geom import *
 from ...color import Color
+from ...gradient import SVGGradient, SVGLinearGradient
 from xml.dom import minidom
 
+# colorの中にgradientを指す何らかを実装するべき。
+# あるいはgradient自体がcolorの継承になるなど。
 
 class SVGGeometry:
     """
     Reference: https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Basic_Shapes
     """
-    def __init__(self, fill="black", stroke=None, stroke_width=".3", fill_opacity=None, stroke_opacity=None):
+    def __init__(self, fill="black", stroke=None, stroke_width=.3, fill_opacity=None, stroke_opacity=None, *args, **kwargs):
         # if None -> color is (-1,-1,-1,-1) , where -1 is padding value
+        self.fill = None
         if isinstance(fill, Color):
             self.fill = fill
+        elif isinstance(fill, str) and (fill.startswith("url(") and fill.endswith(")")):
+            self.fill = fill[5:-1].strip() # NOTE: string
         else:
-            self.fill = Color(fill, fill_opacity) if fill is not None else None # NOTE: fillに文字解析
-        if isinstance(stroke, Color):
+            self.fill = Color(fill, fill_opacity) if fill is not None else None
+        
+        self.stroke = None
+        if isinstance(stroke, Color) or isinstance(stroke, SVGGradient):
             self.storke = stroke
+        elif isinstance(stroke, str) and (stroke.startswith("url(") and stroke.endswith(")")):
+            self.stroke = stroke[5:-1].strip() #NOTE: string
         else:
             self.stroke = Color(stroke, stroke_opacity) if stroke is not None else None
         self.stroke_width = stroke_width
@@ -30,9 +40,16 @@ class SVGGeometry:
     def _get_color_text(self):
         fill_attr = ""
         if self.fill:
-            fill_attr += f'fill="{self.fill.to_str()}" '
+            if isinstance(self.fill, Color):
+                fill_attr += f'fill="{self.fill.to_str()}" '
+            elif isinstance(self.fill, str):
+                fill_attr += f'fill="url(#{self.fill})" '
         if self.stroke:
-            fill_attr += f'stroke="{self.stroke.to_str()}" stroke-width="{self.stroke_width}" '
+            if isinstance(self.stroke, Color):
+                fill_attr += f'stroke="{self.stroke.to_str()}" '
+            elif isinstance(self.stroke, str):
+                fill_attr += f'stroke="url(#{self.stroke.id})" '
+            fill_attr += f'stroke-width="{self.stroke_width}" '
         return fill_attr
 
     @staticmethod

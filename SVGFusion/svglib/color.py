@@ -2,8 +2,12 @@ from __future__ import annotations
 import numpy as np
 from typing import Union, List, Any
 import torch
+import re
+
 Num = Union[int, float]
 float_type = (int, float, np.float32, np.float64)
+
+HEX_COLOR_RE = re.compile(r'^#([A-Fa-f0-9]{6})$')
 
 class Color:
     num_args = 4
@@ -84,16 +88,16 @@ class Color:
     @staticmethod
     def _from_hex(hex_color: str):
         """Convert a hex color string to an RGB color."""
-        if hex_color.startswith('#'):
+        if hex_color.startswith("#"):
             hex_color = hex_color[1:]
         if len(hex_color) == 6:
             r = int(hex_color[0:2], 16)
             g = int(hex_color[2:4], 16)
             b = int(hex_color[4:6], 16)
         elif len(hex_color) == 3:
-            r = int(hex_color[0] * 2, 16)
-            g = int(hex_color[1] * 2, 16)
-            b = int(hex_color[2] * 2, 16)
+            r = int(hex_color[0]*2, 16) 
+            g = int(hex_color[1]*2, 16)
+            b = int(hex_color[2]*2, 16)
         else:
             raise ValueError("Invalid hex color format")
         rgb = [r, g, b]

@@ -28,7 +28,7 @@ class SVGEllipse(SVGGeometry):
 
     def to_str(self, *args, **kwargs):
         color_attr = self._get_color_text()
-        return f'<ellipse {color_attr} cx="{self.center.x}" cy="{self.center.y}" rx="{self.radius.x}" ry="{self.radius.y}"/>'
+        return f'<ellipse {color_attr} cx="{self.center.x}" cy="{self.center.y}" rx="{self.radius.x}" ry="{self.radius.y}"/>\n'
     
     def to_tensor(self, PAD_VAL=-1):
         # NOTE: テンソルの形状については要考察。SVGFusionでも、パスのArcの場合などが不明瞭。また、pathとcircleなど、パラメータが異なる場合に同じ列を使用しているのも気になる
@@ -69,7 +69,7 @@ class SVGCircle(SVGEllipse):
 
     def to_str(self, *args, **kwargs):
         color_attr = self._get_color_text()
-        return f'<circle {color_attr} cx="{self.center.x}" cy="{self.center.y}" r="{self.radius.x}"/>'
+        return f'<circle {color_attr} cx="{self.center.x}" cy="{self.center.y}" r="{self.radius.x}"/>\n'
     
     def to_tensor(self, PAD_VAL=-1):
         elem_index = SVGTensor.ELEMENTS.index("circle")
@@ -105,7 +105,7 @@ class SVGRectangle(SVGGeometry):
         text = f'<rect {color_attr} x="{self.xy.x}" y="{self.xy.y}" width="{self.wh.x}" height="{self.wh.y}"'
         if self.rxy.x != 0 or self.rxy.y != 0 or self.rxt is not None:
             text += f' rx="{self.rxy.x}" ry="{self.rxy.y}"'
-        text += '/>'
+        text += '/>\n'
         return text
     
     def to_tensor(self, PAD_VAL=-1):
@@ -154,7 +154,7 @@ class SVGLine(SVGGeometry):
 
     def to_str(self, *args, **kwargs):
         color_attr = self._get_color_text()
-        return f'<line {color_attr} x1="{self.start_pos.x}" y1="{self.start_pos.y}" x2="{self.end_pos.x}" y2="{self.end_pos.y}"/>'
+        return f'<line {color_attr} x1="{self.start_pos.x}" y1="{self.start_pos.y}" x2="{self.end_pos.x}" y2="{self.end_pos.y}"/>\n'
     
     def to_tensor(self, PAD_VAL=-1):
         elem_index = SVGTensor.ELEMENTS.index("line")
@@ -188,7 +188,7 @@ class SVGPolyline(SVGGeometry):
 
     def to_str(self, *args, **kwargs):
         color_attr = self._get_color_text()
-        return '<polyline {} points="{}"/>'.format(color_attr, ' '.join([p.to_str() for p in self.points]))
+        return '<polyline {} points="{}"/>\n'.format(color_attr, ' '.join([p.to_str() for p in self.points]))
     
     def to_tensor(self, PAD_VAL=-1):
         # path の L(lineto) のセットとして表現しておく
@@ -227,7 +227,7 @@ class SVGPolygon(SVGPolyline):
 
     def to_str(self, *args, **kwargs):
         color_attr = self._get_color_text()
-        return '<polygon {} points="{}"/>'.format(color_attr, ' '.join([p.to_str() for p in self.points]))
+        return '<polygon {} points="{}"/>\n'.format(color_attr, ' '.join([p.to_str() for p in self.points]))
     
 class SVGPathGroup(SVGGeometry):
     # PathGroupそのものはSVGには存在しない仮想的なクラス
@@ -310,7 +310,6 @@ class SVGPathGroup(SVGGeometry):
         txt = ""
         for path in self.paths:
             txt = txt + path.to_str(fill_attr=fill_attr, with_markers=with_markers)
-            txt = txt + "\n"
         return txt
 
     def to_tensor(self, PAD_VAL=-1):

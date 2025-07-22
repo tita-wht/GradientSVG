@@ -59,9 +59,13 @@ class Stop:
 
 class SVGGradient:
     ATTRS = ["id", "gradientUnits", "gradientTransform", "spreadMethod"]
-    def __init__(self, id_name:str, gradient_type:str, stops:List[Stop] = None):
+    def __init__(self, id_name:str, stops:List[Stop] = None):
         self.id = id_name # fill/stroke="id"で指定
-        self.stops = stops
+        self.stops = [] if stops is None else stops
+        if self.stops == []:
+            self.add_stop(0.0, Color("black"))
+            self.add_stop(1.0, Color("white"))
+
         # NOTE: when the number of stops is 1, it is a solid color (its a normal fill / single color)
         self.spreadmethod = "pad" # or "reflect" or "repeat"
         # FIXME: spreadmethodは後で
@@ -96,12 +100,16 @@ class SVGGradient:
 
     def bbox(self):
         raise NotImplementedError
+
+    def match_id(self, id_name: str):
+        """ Check if the gradient matches the given id. """
+        return self.id == id_name
     
 class SVGLinearGradient(SVGGradient):
     ATTRS = SVGGradient.ATTRS + ["x1", "y1", "x2", "y2"]
     # NOTE: x1, y1, x2, y2は0~1(0%~100%)を仮定。gradientUnits属性がデフォルト値以外を取るように拡張する場合はdirection関係を修正する必要あり。
     def __init__(self, id_name:str, x1:float=0.0, y1:float=0.0, x2:float=1.0, y2:float=0.0, stops:List[Stop] = None):
-        super().__init__(id_name, "linear", stops)
+        super().__init__(id_name, stops)
         self.x1 = x1
         self.y1 = y1
         self.x2 = x2
@@ -172,7 +180,7 @@ class SVGRadialGradient(SVGGradient):
     ATTRS = SVGGradient.ATTRS + ["cx", "cy", "r", "fx", "fy", "fr"]
 
     def __init__(self, id_name:str, cx:float=0.5, cy:float=0.5, r:float=1.0, fx:float=None, fy:float=None, fr:float=None, stops:List[Stop] = None):
-        super().__init__(id_name, "radial", stops)
+        super().__init__(id_name, stops)
         self.cx = cx  # 中心のx座標
         self.cy = cy  # 中心のy座標
         self.r = r    # 半径

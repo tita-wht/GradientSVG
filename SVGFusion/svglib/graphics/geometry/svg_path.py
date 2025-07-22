@@ -199,7 +199,7 @@ class SVGPath(SVGGeometry):
             fill_attr = self._get_color_text()
         marker_attr = 'marker-start="url(#arrow)"' if with_markers else ''
         command_attrs = " ".join(command.to_str() for command in self.all_commands())
-        txt = f'<path {fill_attr} {marker_attr} d="{command_attrs}"></path>'
+        txt = f'<path {fill_attr} {marker_attr} d="{command_attrs}"></path>\n'
 
         return txt
 
