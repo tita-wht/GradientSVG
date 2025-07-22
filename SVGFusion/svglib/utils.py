@@ -1,4 +1,4 @@
-import deepsvg.svglib.svg as svg_lib
+from .svg import SVG
 from .geom import Bbox, Point
 import math
 import numpy as np
@@ -32,10 +32,10 @@ def persentage_to_float(persentage_str, default=1.0):
 
 def make_grid(svgs, num_cols=3, grid_width=24):
     """
-        svgs: List[svg_lib.SVG]
+        svgs: List[SVG]
     """
     nb_rows = math.ceil(len(svgs) / num_cols)
-    grid = svg_lib.SVG([], viewbox=Bbox(grid_width * num_cols, grid_width * nb_rows))
+    grid = SVG([], viewbox=Bbox(grid_width * num_cols, grid_width * nb_rows))
 
     for i, svg in enumerate(svgs):
         row, col = i // num_cols, i % num_cols
@@ -48,11 +48,11 @@ def make_grid(svgs, num_cols=3, grid_width=24):
 
 def make_grid_grid(svg_grid, grid_width=24):
     """
-        svg_grid: List[List[svg_lib.SVG]]
+        svg_grid: List[List[SVG]]
     """
     nb_rows = len(svg_grid)
     num_cols = len(svg_grid[0])
-    grid = svg_lib.SVG([], viewbox=Bbox(grid_width * num_cols, grid_width * nb_rows))
+    grid = SVG([], viewbox=Bbox(grid_width * num_cols, grid_width * nb_rows))
 
     for i, row in enumerate(svg_grid):
         for j, svg in enumerate(row):
@@ -65,11 +65,11 @@ def make_grid_grid(svg_grid, grid_width=24):
 
 def make_grid_lines(svg_grid, grid_width=24):
     """
-        svg_grid: List[List[svg_lib.SVG]]
+        svg_grid: List[List[SVG]]
     """
     nb_rows = len(svg_grid)
     num_cols = max(len(r) for r in svg_grid)
-    grid = svg_lib.SVG([], viewbox=Bbox(grid_width * num_cols, grid_width * nb_rows))
+    grid = SVG([], viewbox=Bbox(grid_width * num_cols, grid_width * nb_rows))
 
     for i, row in enumerate(svg_grid):
         for j, svg in enumerate(row):
