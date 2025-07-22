@@ -1,6 +1,7 @@
 from __future__ import annotations
 from .geom import *
 from xml.dom import expatbuilder
+import cssutils
 import torch
 from typing import List, Union
 import IPython.display as ipd
@@ -18,20 +19,41 @@ Num = Union[int, float]
 from .graphics.geometry.svg_command import SVGCommandBezier
 from .graphics.geometry.svg_path import SVGPath, Orientation
 from .graphics.geometry.svg_primitives import SVGPathGroup, SVGRectangle, SVGCircle, SVGEllipse, SVGLine, SVGPolyline, SVGPolygon
+from .gradient import SVGLinearGradient, SVGRadialGradient
 from .geom import union_bbox
 
 view_height = "200px"
 view_width = "200px" # NOTE: move to config
+# MEMO: viewboxは座標系、width/heightは表示サイズ
+# つまり、viewbox座標系によって作成された画像をwidth/heightでスケーリングする。なおアスペクト比は保持され、余白領域は白色（透明？）に塗りつぶされる。（歪んだコンテンツは生成されない）
 
+PRIMITIVES = {
+    "path": SVGPath,
+    "rect": SVGRectangle,
+    "circle": SVGCircle, 
+    "ellipse": SVGEllipse,
+    "line": SVGLine,
+    "polyline": SVGPolyline, "polygon": SVGPolygon
+}
+DEFINITIONS = {
+    "linearGradient": SVGLinearGradient,
+    "radialGradient": SVGRadialGradient,
+    # "pattern": SVGPattern,
+    # "symbol": SVGSymbol,
+    # "clipPath": SVGClipPath,
+}
 
 class SVG:
-    def __init__(self, svg_path_groups: List[SVGPathGroup], viewbox: Bbox = None):
+    def __init__(self, svg_path_groups: List[SVGPathGroup], viewbox: Bbox = None, rules: dict = None, defs: List = None):
         if viewbox is None:
             viewbox = Bbox(24)
 
         self.svg_path_groups = svg_path_groups
         # FIXME: 実際にはパスグループのみではないはずなので、groupsが好ましい
         self.viewbox = viewbox
+
+        self.rules = {} if rules is None else rules
+        self.defs = [] if defs is None else defs
 
     def __add__(self, other: SVG):
         svg = self.copy()
@@ -124,23 +146,52 @@ class SVG:
         svg_path_groups = []
         svg_dom = expatbuilder.parseString(svg_str, False)
         svg_root = svg_dom.getElementsByTagName('svg')[0]
+        svg_style = svg_dom.getElementsByTagName("style")
+        svg_style = svg_style[0] if svg_style else None
+        svg_defs = svg_dom.getElementsByTagName("defs")
+        svg_defs = svg_defs[0] if svg_defs else None
+        # MEMO: style/defsなどの子要素を含むタグの場合、子要素まで含んで取得される(終了タグ</defs>まで)
+        # さらに、同じ関数で内部の子要素まで取得することができる（defsのgradientなど）
+        # ただし、get~TagNameでは #rect1, .stop1 などの<style>内 #IDセレクタや.クラスセレクタは取得できない。
 
-        viewbox_list = list(map(float, svg_root.getAttribute("viewBox").split(" ")))
+        if svg_root.hasAttribute("viewBox"):
+            viewbox_list = list(map(float, svg_root.getAttribute("viewBox").split(" "))) # 内部座標系を設定
+        elif svg_root.hasAttribute("width") and svg_root.hasAttribute("height"):
+            width = float(svg_root.getAttribute("width"))
+            height = float(svg_root.getAttribute("height"))
+            viewbox_list = [0, 0, width, height]
+        else:
+            viewbox_list = [0, 0, 24, 24]
         view_box = Bbox(*viewbox_list)
 
-        primitives = {
-            "path": SVGPath,
-            "rect": SVGRectangle,
-            "circle": SVGCircle, "ellipse": SVGEllipse,
-            "line": SVGLine,
-            "polyline": SVGPolyline, "polygon": SVGPolygon
-        }
+        style_str = svg_style.toxml() if svg_style else ""
+        rules = SVG.get_style_rules(style_str)
 
-        for tag, primitive in primitives.items():
+        defs = []
+        if svg_defs:
+            for tag, primitive in DEFINITIONS.items():
+                for x in svg_defs.getElementsByTagName(tag):
+                    defs.append(primitive.from_xml(x, rules_dict=rules))
+                    print(tag)
+
+        for tag, primitive in PRIMITIVES.items():
             for x in svg_dom.getElementsByTagName(tag):
-                # FIXME: パスグループを使っている → 暗黙的にパスしか許していない？ グループを定義する deepsvgでは前処理でpathに変換している
-                svg_path_groups.append(primitive.from_xml(x))
-        return SVG(svg_path_groups, view_box)
+                svg_path_groups.append(primitive.from_xml(x, rules_dict=rules)) # FIXME: プリミティブ全体へrules_dictを追加
+        return SVG(svg_path_groups, view_box, rules=rules, defs=defs)
+
+    @staticmethod
+    def get_style_rules(txt: str) -> dict:
+        # タグ部分はcssではないので除去
+        if txt.startswith("<style>") and txt.endswith("</style>"):
+            txt = txt[len("<style>"):-len("</style>")]
+        sheet = cssutils.parseString(txt) # warningは無視してOK
+        rules = {}
+        for rule in sheet:
+            if rule.type == rule.STYLE_RULE:
+                rules[rule.selectorText] = {}
+                for property in rule.style:
+                    rules[rule.selectorText][property.name] = property.value
+        return rules
 
     def to_tensor(self, concat_groups=True, PAD_VAL=-1, with_rgba=True):
         group_tensors = [p.to_tensor(PAD_VAL=PAD_VAL) for p in self.svg_path_groups]
@@ -265,9 +316,11 @@ class SVG:
                 '</marker>'
                 '</defs>')
 
-    def to_str(self, with_points=False, with_handles=False, with_bboxes=False, with_markers=False,
-               color_firstlast=False, with_moves=True) -> str:
+    def to_str(self, with_points=False, with_handles=False, with_bboxes=False, with_markers=False, color_firstlast=False, with_moves=True) -> str:
         viz_elements = self._get_viz_elements(with_points, with_handles, with_bboxes, color_firstlast, with_moves)
+        # TODO: ここ、defsとstylesはSVGに外に出してクラス化するのが無難。
+        # defs = self.defs
+        # style = self.rules
         # newline = "\n"
         return (
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{self.viewbox.to_str()}" height="{view_height}" width="{view_width}">\n\n'

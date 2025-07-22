@@ -14,9 +14,14 @@ class Color:
         if rgb is None:
             rgb = [0, 0, 0] # black
         elif isinstance(rgb, str):
-            rgb, alpha = Color.from_str(rgb)
-        elif len(rgb) > 3:
+            rgb, _ = Color.from_str(rgb)
+        elif len(rgb) == 3:
+            pass
+        elif len(rgb) == 4:
             rgb = rgb[:3]  # truncate to first 3 elements
+            alpha = rgb[3] if alpha is None else alpha
+        else:
+            raise ValueError(f"Invalid RGB input. Must be a list of 3 or 4 numbers or a color string; rgb={rgb}, alpha={alpha}")
         self.rgb = np.array(rgb, dtype=np.float32)
 
         alpha = alpha if alpha is not None else 1.0
@@ -74,7 +79,7 @@ class Color:
             rgb, a = Color._from_color_list(str)
         else:
             rgb, a = Color._from_color_name(str)
-        return Color(rgb, a)
+        return rgb, a
     
     @staticmethod
     def _from_hex(hex_color: str):
@@ -98,7 +103,10 @@ class Color:
     def _from_color_name(color_name: str):
         """Convert a color name to an RGB color."""
         color_name = color_name.lower()
-        if color_name in COLOR_RGB_DICT:
+        if color_name.startswith("url"): # class or id
+            return ([0, 0, 0], 1.0)
+
+        elif color_name in COLOR_RGB_DICT:
             rgb = COLOR_RGB_DICT[color_name]
             return (list(rgb), 1.0)
         else:

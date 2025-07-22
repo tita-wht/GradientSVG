@@ -97,7 +97,7 @@ class SVGPath(SVGGeometry):
                 yield cmd, list(map(float, FLOAT_RE.findall(x)))
 
     @staticmethod
-    def from_xml(x: minidom.Element):
+    def from_xml(x: minidom.Element, rules_dict=None, *args, **kwargs):
         color_attrs = SVGGeometry.from_xml_color_attrs(x)
         fill = color_attrs.get("fill", "black")
         stroke = color_attrs.get("stroke", None)

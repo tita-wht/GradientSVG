@@ -41,7 +41,7 @@ class SVGEllipse(SVGGeometry):
                              *([PAD_VAL] * 6)])
     
     @classmethod
-    def from_xml(_, x: minidom.Element):
+    def from_xml(_, x: minidom.Element, rules_dict=None, *args, **kwargs):
         color_attrs = SVGGeometry.from_xml_color_attrs(x)
 
         center = Point(float(x.getAttribute("cx")), float(x.getAttribute("cy")))
@@ -81,7 +81,7 @@ class SVGCircle(SVGEllipse):
                                 *([PAD_VAL] * 6)])
     
     @classmethod
-    def from_xml(_, x: minidom.Element):
+    def from_xml(_, x: minidom.Element, rules_dict=None, *args, **kwargs):
         color_attrs = SVGGeometry.from_xml_color_attrs(x)
 
         center = Point(float(x.getAttribute("cx")), float(x.getAttribute("cy")))
@@ -119,7 +119,7 @@ class SVGRectangle(SVGGeometry):
                              *([PAD_VAL] * 2)])
     
     @classmethod
-    def from_xml(_, x: minidom.Element):
+    def from_xml(_, x: minidom.Element, rules_dict=None, *args, **kwargs):
         color_attrs = SVGGeometry.from_xml_color_attrs(x)
 
         xy = Point(0.)
@@ -166,7 +166,7 @@ class SVGLine(SVGGeometry):
                              *self.end_pos.to_tensor()])
     
     @classmethod
-    def from_xml(_, x: minidom.Element):
+    def from_xml(_, x: minidom.Element, rules_dict=None, *args, **kwargs):
         color_attrs = SVGGeometry.from_xml_color_attrs(x)
 
         start_pos = Point(float(x.getAttribute("x1") or 0.), float(x.getAttribute("y1") or 0.))
@@ -198,7 +198,7 @@ class SVGPolyline(SVGGeometry):
         return torch.cat([p.to_tensor(PAD_VAL=PAD_VAL) for p in paths], dim=0)
     
     @classmethod
-    def from_xml(cls, x: minidom.Element):
+    def from_xml(cls, x: minidom.Element, rules_dict=None, *args, **kwargs):
         
         def extract_args(args):
             FLOAT_RE = re.compile(r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?")

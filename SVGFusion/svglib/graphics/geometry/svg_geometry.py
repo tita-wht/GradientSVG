@@ -36,11 +36,11 @@ class SVGGeometry:
         return fill_attr
 
     @staticmethod
-    def from_xml(x: minidom.Element):
+    def from_xml(x: minidom.Element, *args, **kwargs):
         raise NotImplementedError("This method should be implemented in subclasses")
 
     @staticmethod
-    def from_xml_color_attrs(x: minidom.Element):
+    def from_xml_color_attrs(x: minidom.Element, *args, **kwargs):
         color_attrs = {}
         color_attrs["fill"] = x.getAttribute("fill") if x.hasAttribute("fill") else "black"
         color_attrs["stroke"] = x.getAttribute("stroke") if x.hasAttribute("stroke") else None
