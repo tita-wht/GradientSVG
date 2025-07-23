@@ -15,6 +15,12 @@ import networkx as nx
 from ....difflib.tensor import SVGTensor
 from .svg_geometry import SVGGeometry
 
+# それぞれのクラスに必須属性を記述し、表記を一本化する。
+# その後、装飾の記法を使って、共通する前処理を一貫化。
+
+# その後、color->gradientの改変を行う。
+# to_strをxml.etreeに合わせたリファクタリング
+
 class SVGEllipse(SVGGeometry):
     def __init__(self, center: Point, radius: Radius, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -41,12 +47,12 @@ class SVGEllipse(SVGGeometry):
                              *([PAD_VAL] * 6)])
     
     @classmethod
-    def from_xml(_, x: minidom.Element, rules_dict=None, *args, **kwargs):
+    def from_xml(_, x: minidom.Element, *args, **kwargs):
         color_attrs = SVGGeometry.from_xml_color_attrs(x)
 
         center = Point(float(x.getAttribute("cx")), float(x.getAttribute("cy")))
         radius = Radius(float(x.getAttribute("rx")), float(x.getAttribute("ry")))
-        return SVGEllipse(center, radius, **color_attrs)
+        return SVGEllipse(center, radius, *args, **kwargs, **color_attrs)
 
     def to_path(self):
         p0, p1 = self.center + self.radius.xproj(), self.center + self.radius.yproj()
@@ -81,12 +87,12 @@ class SVGCircle(SVGEllipse):
                                 *([PAD_VAL] * 6)])
     
     @classmethod
-    def from_xml(_, x: minidom.Element, rules_dict=None, *args, **kwargs):
+    def from_xml(_, x: minidom.Element, *args, **kwargs):
         color_attrs = SVGGeometry.from_xml_color_attrs(x)
 
         center = Point(float(x.getAttribute("cx")), float(x.getAttribute("cy")))
         radius = Radius(float(x.getAttribute("r")))
-        return SVGCircle(center, radius, **color_attrs)
+        return SVGCircle(center, radius, *args, **kwargs, **color_attrs)
 
 
 class SVGRectangle(SVGGeometry):
@@ -102,7 +108,7 @@ class SVGRectangle(SVGGeometry):
 
     def to_str(self, *args, **kwargs):
         color_attr = self._get_color_text()
-        id_attr = f'id="{self.id}" ' if hasattr(self, 'id') else ''
+        id_attr = f'id="{self.id}"' if hasattr(self, 'id') else ''
         text = f'<rect {id_attr} {color_attr} x="{self.xy.x}" y="{self.xy.y}" width="{self.wh.x}" height="{self.wh.y}"'
         if self.rxy.x != 0 or self.rxy.y != 0 or self.rxt is not None:
             text += f' rx="{self.rxy.x}" ry="{self.rxy.y}"'
@@ -120,7 +126,7 @@ class SVGRectangle(SVGGeometry):
                              *([PAD_VAL] * 2)])
     
     @classmethod
-    def from_xml(_, x: minidom.Element, rules_dict=None, *args, **kwargs):
+    def from_xml(_, x: minidom.Element, *args, **kwargs):
         id_name = x.getAttribute("id") if x.hasAttribute("id") else None # FIXME: すべてのプリミティブが同じ動作。上位クラスに移動するかよく考える。or装飾を活用してみる。
         color_attrs = SVGGeometry.from_xml_color_attrs(x)
 
@@ -131,7 +137,7 @@ class SVGRectangle(SVGGeometry):
             xy.pos[1] = float(x.getAttribute("y"))
         wh = Size(float(x.getAttribute("width")), float(x.getAttribute("height")))
         rxy = Radius(float(x.getAttribute("rx") or 0.), float(x.getAttribute("ry") or 0.))
-        return SVGRectangle(xy, wh, rxy, **color_attrs, id=id_name)
+        return SVGRectangle(xy, wh, rxy,  *args, **kwargs,**color_attrs, id=id_name)
 
     def to_path(self):
         p0, p1, p2, p3 = self.xy, self.xy + self.wh.xproj(), self.xy + self.wh, self.xy + self.wh.yproj()
@@ -168,12 +174,12 @@ class SVGLine(SVGGeometry):
                              *self.end_pos.to_tensor()])
     
     @classmethod
-    def from_xml(_, x: minidom.Element, rules_dict=None, *args, **kwargs):
+    def from_xml(_, x: minidom.Element, *args, **kwargs):
         color_attrs = SVGGeometry.from_xml_color_attrs(x)
 
         start_pos = Point(float(x.getAttribute("x1") or 0.), float(x.getAttribute("y1") or 0.))
         end_pos = Point(float(x.getAttribute("x2") or 0.), float(x.getAttribute("y2") or 0.))
-        return SVGLine(start_pos, end_pos, **color_attrs)
+        return SVGLine(start_pos, end_pos, *args, **kwargs,**color_attrs)
 
     def to_path(self):
         return SVGPath([SVGCommandLine(self.start_pos, self.end_pos)]).to_group(fill=self.fill,  stroke=self.stroke, stroke_width=self.stroke_width)
@@ -200,7 +206,7 @@ class SVGPolyline(SVGGeometry):
         return torch.cat([p.to_tensor(PAD_VAL=PAD_VAL) for p in paths], dim=0)
     
     @classmethod
-    def from_xml(cls, x: minidom.Element, rules_dict=None, *args, **kwargs):
+    def from_xml(cls, x: minidom.Element, *args, **kwargs):
         
         def extract_args(args):
             FLOAT_RE = re.compile(r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?")
@@ -211,7 +217,7 @@ class SVGPolyline(SVGGeometry):
         args = extract_args(x.getAttribute("points"))
         assert len(args) % 2 == 0, f"Expected even number of arguments for SVGPolyline: {len(args)} given"
         points = [Point(x, args[2*i+1]) for i, x in enumerate(args[::2])]
-        return cls(points, **color_attrs)
+        return cls(points, *args, **kwargs, **color_attrs)
 
     def to_path(self):
         commands = [SVGCommandLine(p1, p2) for p1, p2 in zip(self.points[:-1], self.points[1:])]

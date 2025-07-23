@@ -170,7 +170,7 @@ class SVG:
         defs = []
         for tag, primitive in DEFINITIONS.items():
             for x in svg_dom.getElementsByTagName(tag):
-                defs.append(primitive.from_xml(x, rules_dict=rules))
+                defs.append(primitive.from_xml(x, rules_dict=rules, defs=defs))
                 print(tag)
 
         for tag, primitive in PRIMITIVES.items():

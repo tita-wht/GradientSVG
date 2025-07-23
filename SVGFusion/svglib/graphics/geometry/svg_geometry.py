@@ -22,17 +22,36 @@ class SVGGeometry:
         self.fill = None
         if isinstance(fill, Color):
             self.fill = fill
+        elif isinstance(fill, SVGGradient):
+            self.fill = fill
         elif isinstance(fill, str) and (fill.startswith("url(") and fill.endswith(")")):
-            self.fill = fill[5:-1].strip() # NOTE: string
-        else:
+            id_name = fill[5:-1].strip() # NOTE: string
+            defs =  kwargs.get("defs", [])
+            print(id_name, defs)
+            for d in defs:
+                if isinstance(d, SVGGradient) and d.id == id_name:
+                    self.fill = d
+                    break
+            if self.fill is None:
+                self.fill = Color("black", 1.0)
+                print(f"Warning: Gradient with id {id_name} not found in definitions, using default black fill.")
+        else: # others str or rgb(a) num list
             self.fill = Color(fill, fill_opacity) if fill is not None else None
         
         self.stroke = None
         if isinstance(stroke, Color) or isinstance(stroke, SVGGradient):
             self.storke = stroke
         elif isinstance(stroke, str) and (stroke.startswith("url(") and stroke.endswith(")")):
-            self.stroke = stroke[5:-1].strip() #NOTE: string
-        else:
+            id_name = stroke[5:-1].strip() # NOTE: string
+            defs =  kwargs.get("defs", [])
+            for d in defs:
+                if isinstance(d, SVGGradient) and d.id == id_name:
+                    self.stroke = d
+                    break
+            if self.stroke is None:
+                self.stroke = Color("black", 1.0)
+                print(f"Warning: Gradient with id {id_name} not found in definitions, using default black stroke.")
+        else: # others str or rgb(a) num list
             self.stroke = Color(stroke, stroke_opacity) if stroke is not None else None
         self.stroke_width = stroke_width
         # NOTE: fill/stroke を使用するフラグを出力するべき？
@@ -49,12 +68,12 @@ class SVGGeometry:
         if self.fill:
             if isinstance(self.fill, Color):
                 fill_attr += f'fill="{self.fill.to_str()}" '
-            elif isinstance(self.fill, str):
-                fill_attr += f'fill="url(#{self.fill})" '
+            elif isinstance(self.fill, SVGGradient):
+                fill_attr += f'fill="url(#{self.fill.id})" '
         if self.stroke:
             if isinstance(self.stroke, Color):
                 fill_attr += f'stroke="{self.stroke.to_str()}" '
-            elif isinstance(self.stroke, str):
+            elif isinstance(self.stroke, SVGGradient):
                 fill_attr += f'stroke="url(#{self.stroke.id})" '
             fill_attr += f'stroke-width="{self.stroke_width}" '
         return fill_attr

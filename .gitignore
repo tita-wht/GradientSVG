@@ -7,3 +7,12 @@ gui_data/
 *.ipynb
 NOTE.txt
 dataset/*
+outputs/*
+results/*
+*.pth
+*.pt
+.jpg
+*.png
+*.jpeg
+*.gif
+*.webp
